@@ -1,0 +1,11 @@
+let p = x[!Alice] in
+let n = p.#f in
+let m = p.#g in
+let b = y[!Bob] in
+let c = match b with
+Left x => p.#f + 2
+| Right y => p.#g + 3
+end
+in
+let w = wire !Bob:c in
+w

@@ -1,0 +1,28 @@
+let ap = x[!Alice] in
+let bp = x[!Bob] in
+
+let x1 = ap.#f in
+let x2 = ap.#g in
+let y1 = bp.#f in
+let y2 = bp.#g in
+
+let a = x1 > y1 in
+
+let x3 = match a with
+    Left p => x2
+  | Right q => x1
+end
+in
+
+let y3 = match a with
+    Left p => y1
+  | Right q => y2
+end
+in
+
+let d = x3 > y3 in
+
+match d with
+    Left p => x3
+  | Right q => y3
+end

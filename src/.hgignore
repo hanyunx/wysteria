@@ -1,0 +1,9 @@
+syntax: glob
+
+bin
+*.annot
+*.cm*
+*.orig
+src/parser.ml
+src/parser.mli
+src/lexer.ml

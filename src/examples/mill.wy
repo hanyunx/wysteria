@@ -1,0 +1,51 @@
+let f = \ (x:ps{true}) . \ (y:W x nat) .
+  let tmp2 @ par(x) = 
+    let tmp @ sec(x) =
+      let a = wfold x [y;
+ 	               { #f:!Dummy, #g:0 }; (* assume every one has > 0 salary *)
+	               \ (a:{#f:ps{true}, #g:nat}) . \(b:ps{true}) . \(c:nat) .
+                       if a.#g > c then
+			 a
+		       else
+			 {#f:b, #g:c}
+	              ]
+     in
+     a.#f
+    in 
+    tmp
+  in
+  wire x:tmp2
+in
+
+let all = {!Alice, !Bob, !Charlie} in
+let w1 = wire {!Alice}:47 in
+let w2 = wire {!Bob}:12 in
+let w3 = wire {!Charlie}:55 in
+
+let w7 = w1 ++ w2 in
+let w8 = w7 ++ w3 in
+
+let check_effects @ par(all) = (f all) w8
+in
+
+wcopy as all from check_effects
+
+(*let all = {!Alice, !Bob, !Charlie, !Dave, !Evelyn, !Fred} in
+let w1 = wire {!Alice}:2 in
+let w2 = wire {!Bob}:3 in
+let w3 = wire {!Charlie}:5 in
+let w4 = wire {!Dave}:8 in
+let w5 = wire {!Evelyn}:10 in
+let w6 = wire {!Fred}:20 in
+
+let w7 = w1 ++ w2 in
+let w8 = w7 ++ w3 in
+let w9 = w8 ++ w4 in
+let w10 = w9 ++ w5 in
+let w11 = w10 ++ w6 in
+
+let check_effects @ par(all) = (f all) w11
+in
+
+wcopy as all from check_effects
+*)

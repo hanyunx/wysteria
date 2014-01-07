@@ -1,0 +1,67 @@
+let f = \ (x:ps{true}) . \ (y:W x nat) .
+
+  let tmp2 @ par(x) =
+    let tmp @ sec(x) =
+      let re = 
+        waps x [y; \(z:nat) .
+                wfold x [y; { #f : !Dummy, #g : 200 };
+         	         \(accum:{#f : ps{true}, #g:nat}) . \(notused:ps{true}) . \(loc:nat).
+			 if z = loc then
+			   accum
+			 else
+			   let zminusloc =
+			     if z > loc then z - loc else loc - z
+			   in
+			   if accum.#g > zminusloc then
+			     { #f:notused, #g:zminusloc }
+			   else
+			     accum
+		       ]
+              ]
+      in 
+      (* re contains wire bundle of type W x { #f:ps, #g:nat *)
+      waps x [re; \ (relem:{#f:ps{true}, #g:nat}). relem.#f]
+    in
+  tmp
+  in
+
+  wcopy as x from tmp2
+in 
+
+let all = {!Alice, !Bob, !Charlie} in
+let w1 = wire {!Alice}:2 in
+let w2 = wire {!Bob}:8 in
+let w3 = wire {!Charlie}:5 in
+
+let w7 = w1 ++ w2 in
+let w8 = w7 ++ w3 in
+
+(f all) w8
+
+
+(*let all = {!Alice, !Bob} in
+let w1 = wire {!Alice}:2 in
+let w2 = wire {!Bob}:4 in
+let w3 = w1 ++ w2 in
+
+(f all) w3*)
+
+
+
+
+(*let all = {!Alice, !Bob, !Charlie, !Dave, !Evelyn, !Fred} in
+let w1 = wire {!Alice}:2 in
+let w2 = wire {!Bob}:4 in
+let w3 = wire {!Charlie}:5 in
+let w4 = wire {!Dave}:8 in
+let w5 = wire {!Evelyn}:7 in
+let w6 = wire {!Fred}:9 in
+
+let w7 = w1 ++ w2 in
+let w8 = w7 ++ w3 in
+let w9 = w8 ++ w4 in
+let w10 = w9 ++ w5 in
+let w11 = w10 ++ w6 in
+
+(f all) w11
+*)
