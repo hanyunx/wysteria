@@ -36,7 +36,7 @@ function build()
 	$OCAMLC $FLAGS -o $BIN/wysteria unix.cmxa str.cmxa global.cmx ast.cmx lexer.cmx parser.cmx testtyp.cmx refchk.cmx typchk.cmx cktlib.cmx gmwimpl.cmx gencircuit.cmx opsem.cmx main.cmx \
 	&& \
 	echo "- - - - - - - - - - - - - - - - - -" && \
-    echo "Wysteria interpreter successfully built.\n" && \
+    echo "Wysteria interpreter successfully built.\n"
 }
 
 if [ $# -eq 0 ]
