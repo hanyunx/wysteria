@@ -71,10 +71,10 @@ let test_opsem ast =
     else 
       driver_loop (S.step cfg)
   in
-  let time1 = Unix.gettimeofday () in
+  (*let time1 = Unix.gettimeofday () in*)
   Random.self_init ();
   let final_cfg = driver_loop cfg in
-  let time2 = Unix.gettimeofday () in
+  (*let time2 = Unix.gettimeofday () in*)
   (*print_string "halted, successfully.\n";*)
   
   begin

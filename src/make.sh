@@ -37,12 +37,6 @@ function build()
 	&& \
 	echo "- - - - - - - - - - - - - - - - - -" && \
     echo "Wysteria interpreter successfully built.\n" && \
-    $CPP -o median examples/genmedian.cpp && \
-    $CPP -o optmedian examples/genoptmedian.cpp && \
-    $CPP -o psigen examples/psigen.cpp && \
-    $CPP -o psiinpgen examples/genpsiinp.cpp && \
-    $CPP -o p2pinpgen examples/genp2pinps.cpp && \
-    echo "Median generators compiled.\n"
 }
 
 if [ $# -eq 0 ]
