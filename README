@@ -1,8 +1,7 @@
 INSTALLATION:
 -------------
 
-To install Wysteria, cd into the src directory (a top level directory
-in the checkout) and run following command:
+To install Wysteria, cd into the src directory and run following command:
 
 terminal>./build.sh
 
