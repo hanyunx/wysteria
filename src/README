@@ -1,0 +1,56 @@
+INSTALLATION:
+-------------
+
+To install Wysteria, cd into the src directory (a top level directory
+in the checkout) and run following command:
+
+terminal>./build.sh
+
+This script builds the GMW library (to execute boolean circuits), Z3
+SMT solver (to do refinement type checking for Wysteria programs), and
+the Wysteria interpreter and type checker.
+
+RUNNING EXAMPLES:
+------------------
+
+The examples directory contains 3 sample programs, the main function
+of which is generic in the number of parties.
+
+1. mill.wy : Millionaire application.
+2. gps.wy  : Nearest neighbor application.
+3. spa.wy  : Second-price auction
+
+To run each of these, for let's say three parties, one needs to start
+three instances of the interpreter: one for each party. An instance of
+the interpreter consists of a GMW server and the Wysteria interpreter
+itself.
+
+All the following commands should be run from the src directory in the
+checkout.
+
+To start GMW servers, run following commands (in different terminals,
+if possible):
+
+./mpc.exe 9000 3 addresses.txt 0 10000
+
+./mpc.exe 9001 3 addresses.txt 1 10000
+
+./mpc.exe 9002 3 addresses.txt 2 10000
+
+Once the servers are successfully started, you should see a "Server
+Ready" message on each terminal.
+
+Once this is done, run following 3 commands, again in 3 different
+terminals if possible:
+
+./bin/wysteria --i-am \!Alice --gmw-port 9000 examples/mill.wy
+
+./bin/wysteria --i-am \!Bob --gmw-port 9001 examples/mill.wy
+
+./bin/wysteria --i-am \!Charlie --gmw-port 9002 examples/mill.wy
+
+After the third command is run, you should see the secure computation
+output for each party.
+
+(To run a different example, follow all the steps above, just change
+the filename to the example)
