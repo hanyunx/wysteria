@@ -1,9 +1,6 @@
 open Ffi
 open Printf
 
-let string_of_version (a,b,c) =
-  sprintf "sdl version %d.%d.%d" a b c;;
-
 let () =
   load "extern.cmxs";
 
