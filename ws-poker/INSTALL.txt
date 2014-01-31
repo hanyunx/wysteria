@@ -22,17 +22,17 @@ Requirements, might need more, not sure.
   opam install glMLite
 
 - OcamlSDL2 from piotr's repo
-  git clone git@github.com:piotrm0/OCamlSDL2.git
-  cd OcamlSDL2/src;
+  git clone https://github.com/piotrm0/OCamlSDL2.git
+  cd OcamlSDL2/src
   cp Makefile.config.unix Makefile.config  
   make gen
   make dep
   make opt byte
   make findinstall
-  make install_h
+  sudo make install_h
 
 - OcamlSDL2_image from piotr's repo
-  git clone git@github.com:piotrm0/OCamlSDL2_Image.git
+  git clone https://github.com/piotrm0/OCamlSDL2_Image.git
   cd OcamlSDL2_Image
   make
   make findinstall  
