@@ -2,6 +2,10 @@ open Printf
 open ExtList
 open ExtHashtbl
 
+let get_some x = match x with
+  | Some y -> y
+  | _ -> failwith "couldn't get some"
+
 let float_of_bool b = if b then 1.0 else 0.0
 let string_of_bool b = if b then "true" else "false"
 

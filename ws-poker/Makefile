@@ -29,6 +29,10 @@ SOURCES_TEST := \
 	test.ml
 
 SOURCES_POKER := \
+	glutil.ml sdlutil.ml \
+	loader.ml \
+	cards.ml \
+	glcards.ml \
 	poker.ml
 
 OBJS_COMMON := $(SOURCES_COMMON:.ml=.$(OEXT))
@@ -54,7 +58,7 @@ test: $(OBJS_COMMON) $(OBJS_TEST) poker.$(PEXT)
 run: test
 	./test
 
-poker.cmxs: $(OBJS_COMMON) $(OBJS_POKER) 
+poker.cmxs: $(OBJS_COMMON) $(OBJS_POKER)
 	$(OCAMLC) $(LINK_FLAGS_POKER) -shared $^ -o $@
 
 clean_build:
