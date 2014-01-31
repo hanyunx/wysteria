@@ -2,13 +2,7 @@ open GL
 open Sdl
 open Sdlimage
 open Printf
-
-type tex = {mutable gltid: texture_id option;
-            surf: Sdlsurface.t;
-            width: int;
-            height: int;
-            widthf: float;
-            heightf: float}
+open Sdldefs
 
 let textures = Hashtbl.create 16;;
 
@@ -18,17 +12,21 @@ let load_png f =
 
   let s = load_png_rw rwo in
 
-  let temp = {gltid = None;
-              surf = s;
-              width = Sdlsurface.get_width s;
-              height = Sdlsurface.get_height s;
-              widthf = float_of_int (Sdlsurface.get_width s);
-              heightf = float_of_int (Sdlsurface.get_height s)
+  let w = Sdlsurface.get_width s in
+  let h = Sdlsurface.get_height s in
+
+  let temp = {T.gltid = None;
+              T.surf = s;
+              T.width = w;
+              T.height = h;
+              T.widthf = float_of_int w;
+              T.heightf = float_of_int h;
+              T.aspect = (float_of_int w) /. (float_of_int h)
              } in
 
   let tid = glGenTexture () in
   
-  temp.gltid <- Some tid;
+  temp.T.gltid <- Some tid;
 
   glBindTexture ~target: BindTex.GL_TEXTURE_2D ~texture: tid;
 

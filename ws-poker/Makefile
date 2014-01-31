@@ -30,8 +30,9 @@ SOURCES_TEST := \
 
 SOURCES_POKER := \
 	sdldefs.ml \
-	glutil.ml sdlutil.ml \
 	loader.ml \
+	glutil.ml \
+	sdlutil.ml \
 	cards.ml \
 	glcards.ml \
 	poker.ml

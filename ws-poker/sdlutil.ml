@@ -7,6 +7,8 @@ open Sdldefs
 
 let window_main = ref None
 
+let get_window_main () = Util.get_some !window_main
+
 let string_of_version (a,b,c) =
   sprintf "sdl version %d.%d.%d" a b c;;
 
@@ -23,11 +25,11 @@ let proc_events ev = match ev with
     quit (); exit 0
   | Window_Event { kind = WindowEvent_Resized p } ->
     let w = Util.get_some !window_main in
-    w.width <- p.win_x;
-    w.height <- p.win_y;
-    w.widthf <- float_of_int p.win_x;
-    w.heightf <- float_of_int p.win_y;
-    w.aspect <- w.widthf /. w.heightf;
+    w.W.width <- p.win_x;
+    w.W.height <- p.win_y;
+    w.W.widthf <- float_of_int p.win_x;
+    w.W.heightf <- float_of_int p.win_y;
+    w.W.aspect <- w.W.widthf /. w.W.heightf;
     Glutil.resize w
       
   | Quit e ->
@@ -56,12 +58,12 @@ let init () =
              Sdlwindow.Resizable
             ] in
 
-  let win = {width= 640;
-             height= 480;
-             widthf= 640.0;
-             heightf= 480.0;
-             aspect=640.0 /. 480.0;
-             win= w} in
+  let win = {W.width= 640;
+             W.height= 480;
+             W.widthf= 640.0;
+             W.heightf= 480.0;
+             W.aspect=640.0 /. 480.0;
+             W.win= w} in
 
   window_main := Some win;
 
@@ -79,7 +81,7 @@ let init () =
 ;;
 
 let loop () =
-  let win = (Util.get_some !window_main).win in
+  let win = (Util.get_some !window_main).W.win in
 
   while true do
     event_loop ();
