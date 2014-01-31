@@ -1,0 +1,44 @@
+Requirements, might need more, not sure.
+
+- homebrew
+  ruby -e "$(curl -fsSL https://raw.github.com/Homebrew/homebrew/go/install)"
+
+- SDL2
+  brew install sdl2
+- SDL2_image
+  brew install sdl2_image
+
+- opam
+  brew install opam
+  opam init
+
+- ocamlfind
+  opam install ocamlfind
+
+- extlib
+  opam install extlib
+
+- glMLite
+  opam install glMLite
+
+- OcamlSDL2 from piotr's repo
+  git clone git@github.com:piotrm0/OCamlSDL2.git
+  cd OcamlSDL2/src;
+  cp Makefile.config.unix Makefile.config  
+  make gen
+  make dep
+  make opt byte
+  make findinstall
+  make install_h
+
+- OcamlSDL2_image from piotr's repo
+  git clone git@github.com:piotrm0/OCamlSDL2_Image.git
+  cd OcamlSDL2_Image
+  make
+  make findinstall  
+
+If you want to remake the card graphics:
+
+- imagemagick
+  brew install imagemagick
+
