@@ -29,6 +29,7 @@ SOURCES_TEST := \
 	test.ml
 
 SOURCES_POKER := \
+	sdldefs.ml \
 	glutil.ml sdlutil.ml \
 	loader.ml \
 	cards.ml \
@@ -52,14 +53,14 @@ LINK_FLAGS_COMMON := $(BUILD_FLAGS_COMMON)
 LINK_FLAGS_TEST := $(BUILD_FLAGS_TEST)
 LINK_FLAGS_POKER := $(BUILD_FLAGS_POKER)
 
+poker.$(PEXT): $(OBJS_COMMON) $(OBJS_POKER)
+	$(OCAMLC) $(LINK_FLAGS_POKER) -shared $^ -o $@
+
 test: $(OBJS_COMMON) $(OBJS_TEST) poker.$(PEXT)
 	$(OCAMLC) $(LINK_FLAGS_TEST) $(OBJS_COMMON) $(OBJS_TEST) -o $@
 
 run: test
 	./test
-
-poker.cmxs: $(OBJS_COMMON) $(OBJS_POKER)
-	$(OCAMLC) $(LINK_FLAGS_POKER) -shared $^ -o $@
 
 clean_build:
 	rm -rf *~ *.cm* *.o *.annot test *.dSYM .dep .DS_Store 
@@ -81,8 +82,5 @@ $(SOURCES_TEST:.ml=.$(OEXT)) : $(@:.$(OEXT)=.ml)
 $(SOURCES_POKER:.ml=.$(OEXT)) : $(@:.$(OEXT)=.ml)
 	$(OCAMLC) $(BUILD_FLAGS_POKER) -c $(@:.$(OEXT)=.ml)
 
-#%.cmi : %.mli
-#	$(OCAMLC) $(BUILD_FLAGS_TEST) -c $<
-
 .dep: $(SOURCES)
-	$(OCAMLDEP) $(SOURCES) > .dep
+	$(OCAMLDEP) $(SOURCES_COMMON) $(SOURCES_POKER) $(SOURCES_TEST) > .dep
