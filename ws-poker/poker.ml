@@ -87,11 +87,12 @@ let render_cards () =
 
   glPopMatrix ()
 
-let render () =
-  rot1 := !rot1 +. 0.02;
-  rot2 := !rot2 +. 1.3;
-  rot3 := !rot3 +. 0.7;
+let update dt = 
+  rot1 := !rot1 +. 3.0 *. dt;
+  rot2 := !rot2 +. 13.0 *. dt;
+  rot3 := !rot3 +. 7.0 *. dt
 
+let render () =
   glClear [GL_COLOR_BUFFER_BIT; GL_DEPTH_BUFFER_BIT];
 
   render_cards ();
@@ -105,6 +106,7 @@ let ui_start () =
   load_gfx ();
 
   Sdlutil.callback_render := render;
+  Sdlutil.callback_update := update;
 
   Sdlutil.loop ();
   Sdlutil.quit ()

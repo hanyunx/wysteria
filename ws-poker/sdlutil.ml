@@ -5,6 +5,13 @@ open Sdlscancode
 
 open Sdldefs
 
+let target_delay = ref 0
+
+let set_target_fps f =
+  target_delay := int_of_float (1000.0 /. f)
+  
+let () = set_target_fps 60.0
+
 let window_main = ref None
 
 let get_window_main () = Util.get_some !window_main
@@ -14,10 +21,13 @@ let string_of_version (a,b,c) =
 
 let callback_render = ref (fun () -> ());;
 let callback_proc_events = ref (fun e -> ());;
+let callback_update = ref (fun dt -> ());;
 
 let render () = !callback_render ();;
+let update dt = !callback_update dt;;
 
 let quit () =
+  Sdl.Audio.quit ();
   Sdl.quit ()
 
 let proc_events ev = match ev with
@@ -76,6 +86,12 @@ let init () =
   ignore (Sdl.GL.make_current ~win: w ~ctx: c);
   let x = Sdl.GL.get_swap_interval () in
 
+  let dname = (Sdl.Audio.get_drivers ()).(0) in
+
+  printf "initializing audio: %s\n%!" dname;
+
+  Sdl.Audio.init ~driver_name: dname;
+  
   Glutil.init ();
   Glutil.resize win
 ;;
@@ -83,11 +99,24 @@ let init () =
 let loop () =
   let win = (Util.get_some !window_main).W.win in
 
+  let last_tick = ref 0 in
+
   while true do
+    let delay = (Sdl.Timer.get_ticks ()) - !last_tick in
+
+    if delay <= !target_delay then Sdl.Timer.delay (!target_delay - delay);
+ 
+    let current_tick = Sdl.Timer.get_ticks () in
+    let delay = !last_tick - current_tick in
+    last_tick := current_tick;
+
     event_loop ();
+
+    update ((float_of_int delay) *. 0.001);
+
     render ();
+
     Sdl.GL.swap_window win;
-    Sdl.Timer.delay (1000 / 60);
   done
 ;;
 
