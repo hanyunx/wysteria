@@ -9,9 +9,9 @@ open Sdlimage
 
 open Sdldefs
 
-let rot1 = ref 0.0;;
-let rot2 = ref 0.0;;
-let rot3 = ref 0.0;;
+let rot_circle = ref 0.0;;
+let rot_card_horizontal = ref 0.0;;
+let rot_card_vertical = ref 0.0;;
 
 let load_cards () =
   List.iter (fun (s,c) ->
@@ -25,16 +25,12 @@ let load_gfx () =
   ignore (Loader.load_png "gfx/logo.png")
 
 let render_logo () =
-  (*let t = Loader.bind_texture "gfx/logo.png" in*)
-
   Glutil.enable2d ();
 
   glEnable GL_TEXTURE_2D;
 
   glDisable GL_LIGHTING;
   glDisable GL_DEPTH_TEST;
-
-  (*glDisable GL_CULL_FACE;*)
 
   let t = Loader.bind_texture "gfx/logo.png" in
 
@@ -65,21 +61,21 @@ let render_cards () =
   glEnable GL_LIGHTING;
   glEnable GL_LIGHT0;
 
-  let a = ref (37.0 +. !rot2) in
-  let b = ref (73.0 +. !rot3) in
+  let a = ref (0.0 +. !rot_card_vertical) in
+  let b = ref (0.0 +. !rot_card_horizontal) in
 
   glTranslatev (0.0, 0.0, -10.0);
   glRotatev ~angle: (5.0) ~vec: (1.0, 0.0, 0.0);
 
-  glRotatev ~angle: !rot1 ~vec: (0.0, 1.0, 0.0);
+  glRotatev ~angle: !rot_circle ~vec: (0.0, 1.0, 0.0);
 
   List.iter (fun (s,c) ->
     glRotatev ~angle: (360.0 /. 52.0) ~vec: (0.0, 1.0, 0.0);
     glPushMatrix();
     glTranslatev (10.0, 0.0, 0.0);
-    (*glRotatev ~angle: !a ~vec: (1.0, 0.0, 0.0);*)
+(*    glRotatev ~angle: !a ~vec: (1.0, 0.0, 0.0);*)
     glRotatev ~angle: !b ~vec: (0.0, 1.0, 0.0);
-    a := !a +. (360.0 /. 52.0);
+    (*a := !a +. (360.0 /. 52.0);*)
     b := !b +. (360.0 /. 52.0);
     Glcards.render (c ^ s);
     glPopMatrix();
@@ -88,9 +84,12 @@ let render_cards () =
   glPopMatrix ()
 
 let update dt = 
-  rot1 := !rot1 +. 3.0 *. dt;
-  rot2 := !rot2 +. 13.0 *. dt;
-  rot3 := !rot3 +. 7.0 *. dt
+  rot_circle := !rot_circle +.
+    1.3 *. dt;
+  rot_card_vertical := !rot_card_vertical +.
+    13.7 *. dt;
+  rot_card_horizontal := !rot_card_horizontal +.
+    37.3 *. dt
 
 let render () =
   glClear [GL_COLOR_BUFFER_BIT; GL_DEPTH_BUFFER_BIT];
