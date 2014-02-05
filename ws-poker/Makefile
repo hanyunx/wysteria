@@ -43,7 +43,7 @@ OBJS_POKER := $(SOURCES_POKER:.ml=.$(OEXT))
 
 PACKS_COMMON := dynlink extlib unix
 PACKS_TEST := dynlink extlib unix
-PACKS_POKER := extlib sdl2 sdl2_img glMLite glMLite.glut glMLite.glu
+PACKS_POKER := extlib sdl2.ba sdl2 sdl2_img sdl2_mix glMLite glMLite.glut glMLite.glu
 
 BUILD_FLAGS_COMMON := $(OCAML_FLAGS) $(PACKS_COMMON:%=-package %)
 BUILD_FLAGS_TEST := $(BUILD_FLAGS_COMMON) $(PACKS_TEST:%=-package %)

@@ -43,7 +43,7 @@ let load_png f =
     ~height: temp.height
     ~format_: mode
     ~type_: GL_UNSIGNED_BYTE
-    ~pixels: (Bigarray.genarray_of_array1 (Sdlsurface.get_pixels s));
+    ~pixels: (Bigarray.genarray_of_array1 (Sdlsurface_ba.get_pixels s));
 
   glTexParameter
     ~target: TexParam.GL_TEXTURE_2D

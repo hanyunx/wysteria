@@ -7,6 +7,10 @@ Requirements, might need more, not sure.
   brew install sdl2
 - SDL2_image
   brew install sdl2_image
+- ogg
+  brew install ogg
+- SDL2_mixer
+  brew install sdl2_mixer
 
 - opam
   brew install opam
@@ -37,8 +41,13 @@ Requirements, might need more, not sure.
   make
   make findinstall  
 
+- OcamlSDL2_mixer from piotr's repo
+  git clone https://github.com/piotrm0/OCamlSDL2_Mixer.git
+  cd OcamlSDL2_Mixer
+  make
+  make findinstall  
+
 If you want to remake the card graphics:
 
 - imagemagick
   brew install imagemagick
-

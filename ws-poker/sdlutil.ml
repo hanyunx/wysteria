@@ -91,7 +91,23 @@ let init () =
   printf "initializing audio: %s\n%!" dname;
 
   Sdl.Audio.init ~driver_name: dname;
+
+  printf "initializing mixer: %d.%d\n%!"
+    (Sdlmixer.get_major_version ())
+    (Sdlmixer.get_minor_version ());
+
+  Sdlmixer.init [`MP3];
   
+  let m = Sdlmixer.load_music "audio/ambiance1.ogg" in
+
+  Sdlmixer.open_audio
+    (Sdlmixer.get_default_frequency ())
+    (Sdlaudio.AUDIO_S32SYS)
+    (Sdlmixer.get_default_channels ())
+    1024;
+
+  Sdlmixer.play_music m (-1);
+
   Glutil.init ();
   Glutil.resize win
 ;;
