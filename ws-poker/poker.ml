@@ -107,6 +107,9 @@ let ui_start () =
   Sdlutil.callback_render := render;
   Sdlutil.callback_update := update;
 
+  let m = Sdlmixer.load_music "audio/ambiance1.ogg" in
+  Sdlmixer.play_music m (-1);
+
   Sdlutil.loop ();
   Sdlutil.quit ()
 

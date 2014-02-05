@@ -98,15 +98,11 @@ let init () =
 
   Sdlmixer.init [`OGG];
   
-  let m = Sdlmixer.load_music "audio/ambiance1.ogg" in
-
   Sdlmixer.open_audio
     (Sdlmixer.get_default_frequency ())
-    (Sdlaudio.AUDIO_S32SYS)
+    (Sdlaudio.AUDIO_U8)
     (Sdlmixer.get_default_channels ())
-    1024;
-
-  Sdlmixer.play_music m (-1);
+    4096;
 
   Glutil.init ();
   Glutil.resize win
