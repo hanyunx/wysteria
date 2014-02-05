@@ -96,7 +96,7 @@ let init () =
     (Sdlmixer.get_major_version ())
     (Sdlmixer.get_minor_version ());
 
-  Sdlmixer.init [`MP3];
+  Sdlmixer.init [`OGG];
   
   let m = Sdlmixer.load_music "audio/ambiance1.ogg" in
 
