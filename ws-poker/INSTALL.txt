@@ -29,23 +29,18 @@ Requirements, might need more, not sure.
   git clone https://github.com/piotrm0/OCamlSDL2.git
   cd OcamlSDL2/src
   cp Makefile.config.unix Makefile.config  
-  make gen
-  make dep
-  make opt byte
-  make findinstall
+  make reinstall
   sudo make install_h
 
 - OcamlSDL2_image from piotr's repo
   git clone https://github.com/piotrm0/OCamlSDL2_Image.git
   cd OcamlSDL2_Image
-  make
-  make findinstall  
+  make reinstall
 
 - OcamlSDL2_mixer from piotr's repo
   git clone https://github.com/piotrm0/OCamlSDL2_Mixer.git
   cd OcamlSDL2_Mixer
-  make
-  make findinstall  
+  make reinstall
 
 If you want to remake the card graphics:
 

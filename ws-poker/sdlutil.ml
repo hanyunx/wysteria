@@ -100,7 +100,7 @@ let init () =
   
   Sdlmixer.open_audio
     (Sdlmixer.get_default_frequency ())
-    (Sdlaudio.AUDIO_U8)
+    (Sdlmixer.get_default_format ())
     (Sdlmixer.get_default_channels ())
     4096;
 
