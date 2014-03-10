@@ -8,7 +8,7 @@ Requirements, might need more, not sure.
 - SDL2_image
   brew install sdl2_image
 - ogg
-  brew install ogg
+  brew install libogg
 - SDL2_mixer
   brew install sdl2_mixer
 
@@ -29,7 +29,7 @@ Requirements, might need more, not sure.
   git clone https://github.com/piotrm0/OCamlSDL2.git
   cd OcamlSDL2/src
   cp Makefile.config.unix Makefile.config  
-  make reinstall
+  make findreinstall
   sudo make install_h
 
 - OcamlSDL2_image from piotr's repo
