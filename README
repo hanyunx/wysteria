@@ -52,7 +52,41 @@ After the third command is run, you should see the secure computation
 output for each party.
 
 (To run a different example, follow all the steps above, just change
-the filename to the example)
+the filename to the example).
+
+----
+FAQ:
+----
+
+Q. Which datatypes are supported in Wysteria ?
+A. Wysteria supports natural numbers, booleans, arrays, records, sum
+types, and function types. In addition, Wysteria also has support for
+Wire bundle types and Share types (see our paper for more details on
+these: http://www.cs.umd.edu/~aseem/wysteria.pdf). Supported types are
+listed in file ast.ml under OCaml datatype "typ".
+
+Q. Which binary operators are supported in Wysteria ?
+A. Wysteria supports following operators for natural numbers: addition
+(+), subtraction (-), greater than (>), and equals (=). Supported
+operators are listed in file ast.ml under OCaml datatype "natop".
+
+Q. Is it possible to select random numbers in Wysteria ?
+A. Wysteria supports random number selection via following expression:
+
+sysop rand <n>
+
+where n is a natural number constant. At run time, Wysteria
+interpreter evaluates this by calling Random.int <n> in OCaml
+(http://caml.inria.fr/pub/docs/manual-ocaml/libref/Random.html). Expression
+sysop rand <n> has type nat in Wysteria.
+
+Q. What is the bit width of Wysteria nat types when generating boolean
+circtuis ?
+A. Nat width for boolean circtuis in Wysteria taken from
+cktlib.ml (variable natsize). Currently it is set to 12 bits, but can
+be changed to a different value (4, 8, ...).
+
+
 
 For any queries or suggestions, please contact:
 
