@@ -1,0 +1,141 @@
+let rand = \(myunit:unit). sysop rand 17 in
+
+let mkdeal =  \(x:ps{true}).
+
+  let dummy = wire x:0 in
+  let zerosh @ par(x) =  (* GMW bug, needs inputs for each party and AND gates *)
+    let y = dummy in
+    let y1 = 2 + 2 in
+    let zerosh1 @ sec(x) = makesh 0 in
+    zerosh1
+  in
+
+  let dealt @ par(x)  = array [ 52 ] of zerosh in
+  let ndealt @ par(x) = array [ 1 ] of 0 in
+  
+  let deal = \(tgt:ps{singl and subeq x}).
+
+    let w @ par(x) =
+      let check = \(rs:W x nat). (* check if sum of these random numbers is already dealt *)
+        let nd = select ndealt[0] in
+        let sum @ sec(x) = 
+          let s = wfold x [rs; 0; \(n1:nat).\(p:ps{true}).\(n2:nat). n1 + n2 ] in
+          makesh s
+        in
+
+        let checkloop = 
+          fix checkloop:(i:nat) -> {#sum:Sh x nat, #success: bool}. (i:nat).
+            if i = nd then 
+              {#sum:sum, #success:true}
+            else
+              let sd = select dealt[i] in
+	      let dummy2 = wire x:0 in
+              let cmp @ sec(x) = 
+		let y = dummy2 in
+		let tmp1 = combsh sd in
+		let tmp2 = combsh sum in
+		tmp1 = tmp2
+              in
+	      if cmp then
+		{#sum:sum, #success:false}
+	      else
+		let j = i + 1 in
+		checkloop j
+	in (* end checkloop *)
+	checkloop 0
+      in (* end check *)
+
+      let retryloop = 
+        fix retryloop: (tmp5:unit) -> W tgt nat. (tmp5:unit).
+        let myrand = \(z:unit).rand () in
+        let rs = wapp x [wire x:(); wire x:myrand] in
+	let res = check rs in
+	if res.#success then
+          let nd   = select ndealt[0] in
+          let tmp6 = update dealt [nd] <- res.#sum in
+          let tmp7 = update ndealt [0] <- nd + 1 in
+	  let dummy1 = wire x:0 in
+          let card @ sec(x) = 
+	    let y = dummy1 in
+	    let y1 = 2 + 2 in
+            let s = combsh (res.#sum) in
+            wire tgt:s
+          in
+          card
+	else
+	  (*let _ = print 1111 in*)
+          retryloop ()
+      in (* end retryloop *)
+      retryloop ()
+    in (* end w *)
+
+    wcopy as x from w (* end lambda *)
+  in (* end let deal = *)
+
+  let verify = \(z:ps{singl and subeq x}). \(w:W z nat) . \(i:nat) .
+    let card_sh @ par(x) = select dealt[i] in
+    let dummy3 = wire x:0 in
+    let cmp1 @ par(x) =
+      let cmp @ sec(x) =
+	let y = dummy3 in
+	let card_arr = combsh card_sh in
+	let card = w[z] in
+	let b = card = card_arr in
+	wire x:b
+      in
+      cmp
+    in
+    wcopy as x from cmp1
+  in 
+
+  { #deal : deal, #verify : verify }
+in (* end mkdeal *)
+
+let numcards = 15 in
+
+let all = {!Alice,!Bob,!Charlie} in
+let tgt = !Bob in
+
+let tgtcards @ par(tgt) = array [ 52 ] of false in
+
+let dealfns = mkdeal all in
+let deal = dealfns.#deal in
+
+let l = fix f : (i:nat) -par(all) -> unit . (i:nat) .
+          if i = numcards then ()
+	  else
+	    let c = deal tgt in
+	    (*let d = print c in*)
+	    let check @ par(tgt) =
+	      let crd = c[tgt] in
+	      let seen = select tgtcards[crd] in
+	      let tmp2 = print seen in
+	      let tmp3 = update tgtcards[crd] <- true in
+	      ()
+	    in
+	    let nexti = i + 1 in
+	    f nexti
+in
+
+l 0
+
+(*let c @ par(all) =
+  let dealfns = mkdeal all in
+  let deal = dealfns.#deal in
+  let verify = dealfns.#verify in
+  let c1 = deal tgt in
+  let c2 = deal tgt in
+  let c3 = deal tgt in
+  let c4 = deal tgt in
+  let c5 = deal tgt in
+  let t1 = print c1 in
+  let t2 = print c2 in
+  let t3 = print c3 in
+  let t4 = print c4 in
+  let t5 = print c5 in
+  (*let b1 = (((verify tgt) c1) 0) in
+  b1*)
+  wire all:0
+in
+wcopy as all from c
+*)
