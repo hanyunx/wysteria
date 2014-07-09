@@ -23,7 +23,7 @@ echo "Building Z3"
 
 pushd ../z3 &> /dev/null
 autoconf
-./configure
+./configure CXX=clang++
 python scripts/mk_make.py
 pushd build &> /dev/null
 make

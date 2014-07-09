@@ -39,6 +39,8 @@ module Make (Flags:OPSEM_FLAGS) = struct
   exception Impossible
   exception NYI           (* Not yet implemented. *)
 
+  exception Parse_error of exn * (int * int * string)
+
   (* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - *)
   (* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - *)
   (* Missing pieces *)
@@ -190,8 +192,8 @@ module Make (Flags:OPSEM_FLAGS) = struct
   (* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - *)
         
   let pp_cfg cfg =
-    (*if ! Global.debug_store then begin*)
-    if true then begin
+    if ! Global.debug_store then begin
+    (*if true then begin *)
       print_string "STO= {" ;
       ignore begin
         Store.fold begin fun l array is_first ->
@@ -226,7 +228,7 @@ module Make (Flags:OPSEM_FLAGS) = struct
   (* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - *)
 
 (*  let initial : (Raw.var_nd * Raw.value_nd) list -> expr_nd -> cfg = fun secrets e ->  *)
-  let initial : expr_nd -> cfg = fun e -> 
+  let initial : ?env:env -> expr_nd -> cfg = fun ?env:(env=Env.empty) e -> 
     let our_mode = {
       data=Par; 
       info=dummyinfo;
@@ -241,22 +243,34 @@ module Make (Flags:OPSEM_FLAGS) = struct
     let values_of_princs ps = 
       List.map value_of_princ ps 
     in
-    let our_place = 
-      let princs_value = 
+    let our_place, princname = 
+      let princs_value, princname = 
         match Flags.variant with
           | `Multi_party_simulation princs ->
               { data=(V_ps_lit (values_of_princs princs));
                 info=dummyinfo;
-                prov=Global.Prov.Synth } 
+                prov=Global.Prov.Synth }, ""
           | `Single_party_protocol princ -> 
               { data=(V_ps_lit [value_of_princ princ]);
                 info=dummyinfo;
-                prov=Global.Prov.Synth } 
+                prov=Global.Prov.Synth }, princ
       in
-      Pl_ps (our_mode, princs_value)
+      Pl_ps (our_mode, princs_value), princname
     in
+    
+    (*
+     * add binding for __me__ to the environment.
+     * in Multi-party mode, __me__ is bound to "".
+     *)
+    let mevarnd = { prov = Global.Prov.Synth; data = Var(Ast._mevar); info = T_string } in
+    let mevalnd = { prov = Global.Prov.Synth; data = V_string(princname); info = T_string } in
+    let env' = Env.add mevarnd.data { var = mevarnd; place = { data=our_place;
+							       info=dummyinfo;
+							       prov=Global.Prov.Synth
+							     };
+				      value = mevalnd } env in
     {
-      env    = Env.empty ;
+      env    = env'  ; (* default is _mevar binding -- earlier was empty env *)
       store  = Store.empty ;
       nxtloc = 0 ;
       expr   = e ;
@@ -296,6 +310,8 @@ module Make (Flags:OPSEM_FLAGS) = struct
 	v_var      = begin fun v -> cmap.v_var v, emp end;
 	v_bool     = begin fun b -> cmap.v_bool b, emp end;
 	v_nat      = begin fun n -> cmap.v_nat n, emp end;
+        v_string   = begin fun s -> cmap.v_string s, emp end;
+        v_proc     = begin fun p -> cmap.v_proc p, emp end;
 	v_unit     = begin fun x -> cmap.v_unit x, emp end;
 	v_inj      = begin fun c vs -> cmap.v_inj c (fst (List.split vs)), emp end;
 	v_row      = begin fun l -> let (flds, l') = List.split l in
@@ -487,7 +503,9 @@ module Make (Flags:OPSEM_FLAGS) = struct
         e_avar   = begin fun v               -> e (* e is IGNORED: see e_app. *) end ;
         e_lam    = begin fun (l, e)          -> env, fun y -> e (* e is IGNORED: see e_app. *) end ;
         e_print  = begin fun e               -> env, fun y -> g(E_print y) end ;
-        e_sysop  = begin fun (vr, l)         -> g (E_sysop(vr, l)) end ;
+        e_sysop  = begin fun (vr, tyop, l)   -> g (E_sysop(vr, tyop, l)) end ;
+
+        e_cast   = begin fun (e, t)          -> env, fun y -> g(E_cast (y, t)) end ;      
 
         (* XFORM case: Application chain ~~> let-binding chain. *)
         e_app = begin fun (apphd, e2) -> env, env, fun _ e2' ->          
@@ -559,16 +577,111 @@ module Make (Flags:OPSEM_FLAGS) = struct
         end ;
       }
     in
+    
+    let parse_value : string -> string -> value_nd = 
+      let module Lexer = Wylexer in
+      let module Parser = Wyparser in
+      fun filename string ->
+        let lexbuf = Lexing.from_string string in
+        let pos = lexbuf.Lexing.lex_curr_p in
+        let _ = 
+          lexbuf.Lexing.lex_curr_p <- 
+            { pos with 
+                Lexing.pos_fname = filename ; 
+                Lexing.pos_lnum = 1 ; 
+            } 
+        in
+        let _ = Global.set_lexbuf lexbuf in
+        let ast : value_nd = 
+          try Parser.value Lexer.token lexbuf
+          with 
+            | exn -> begin
+                let curr = lexbuf.Lexing.lex_curr_p in
+                let line = curr.Lexing.pos_lnum in
+                let cnum = curr.Lexing.pos_cnum - curr.Lexing.pos_bol in
+                let tok = Lexing.lexeme lexbuf in
+                raise (Parse_error (exn, (line, cnum, tok)))
+              end
+        in
+        ast
+    in
 
-    let exec_sysop (sys:string) (vals:value_nd list) :value_nd =
-      if sys = "rand" then
-	match vals with
-	  | [{data=V_nat(n)}] ->
-	    let r = Random.int n in
-	    astgen (V_nat(r)) T_nat
-	  | _ -> raise (Stuck cfg)
-      else
-	raise (Stuck cfg)
+    let exec_sysop (sys:string) (typ_op:typ_nd option) (vals:value_nd list) :value_nd =
+      let module Proc = Sysproc.Proc in
+      match sys with
+        | "rand" ->
+	    begin match typ_op, vals with
+	      | None, [{data=V_nat(n)}] ->
+	          let r = Random.int n in
+	          astgen (V_nat(r)) T_nat
+	      | _ -> raise (Stuck cfg)
+            end
+
+        | "run" ->
+	    begin match typ_op, vals with
+	      | None, [{data=V_string(s)}] ->
+                  astgen (V_proc (Proc.run s)) T_proc
+	      | _ -> raise (Stuck cfg)
+            end
+
+        | "send" ->
+            begin match typ_op, vals with
+              | None, {data=V_proc(p)} :: values ->
+                  let ss = List.map Ast.Pretty.string_of_value_nd values in
+                  let s  = match ss with
+                    | [] -> ""
+                    | one :: more ->
+                        List.fold_left (fun a b -> a ^ " " ^ b) one more 
+                  in
+                  Proc.send p s ;
+                  astgen (V_unit) T_unit
+
+	      | _ -> raise (Stuck cfg)
+            end            
+
+        | "recv" ->
+            begin match typ_op, vals with
+              | Some typ, [{data=V_proc(p)}] ->
+                  let str = Proc.recv p in
+                  let vnd = parse_value ("sysop recv") str in
+                  (* TODO: Type-check vnd and compare its type against typ *)
+                  (* TODO: Fail if types do not agree. *)
+                  vnd
+
+	      | _ -> raise (Stuck cfg)
+            end 
+
+        | "ignore" ->
+            begin match typ_op, vals with
+              | None, [{data=V_proc(p)}] ->
+                let _ = Proc.recv p in
+                  (*let vnd = parse_value ("sysop recv") str in*)
+                  (* TODO: Type-check vnd and compare its type against typ *)
+                  (* TODO: Fail if types do not agree. *)
+                astgen V_unit T_unit
+
+	      | _ -> raise (Stuck cfg)
+            end 
+
+        | "stop" ->
+            begin match typ_op, vals with
+              | None, [{data=V_proc(p)}] ->
+                  Proc.stop p ;
+                  astgen (V_unit) T_unit
+
+	      | _ -> raise (Stuck cfg)
+            end
+	      
+	| "strcat" ->
+	  begin match typ_op, vals with
+	    | None, [{data=V_string(s1)}; {data=V_string(s2)}] ->
+	      let delim = String.make 1 '"' in
+	      parse_value ("sysop strcat") (delim ^ s1 ^ s2 ^ delim)
+	    | _ -> raise (Stuck cfg)
+	  end
+
+        | _ ->
+	    raise (Stuck cfg)
     in
 
     match cfg.expr.data with
@@ -714,8 +827,8 @@ module Make (Flags:OPSEM_FLAGS) = struct
                            Typd.env -> (string * Raw.typ) list -> 
                            Typd.expr_nd -> Typd.value_nd 
                       *)
-                    (*print_string "SEC-BLOCK BEGIN:" ; print_newline ();*)
-                    (*pp_cfg cfg ;
+                    (*print_string "SEC-BLOCK BEGIN:" ; print_newline ();
+                    (*pp_cfg cfg ;*)
                     print_newline () ;*)
                     (*let v = Gencircuit.runsecblk princ princs cfg.env wire_vars e1 in*)
                     let v = Gencircuit.runsecblk princ princs openenv wire_vars e1 in
@@ -1157,6 +1270,9 @@ module Make (Flags:OPSEM_FLAGS) = struct
       (* paren -- vanishes. *)
       | E_paren e -> { cfg with expr = e }
 
+      (* cast -- vanishes. *)
+      | E_cast (e, _) -> { cfg with expr = e }
+
       (* Combine: In simulation mode, so just treat as a no-op. *)
       | E_comb e when (expr_is_value cfg e.data) -> { cfg with expr = e }
       | E_comb e -> stk_push cfg e (fun e -> astgen' (E_comb(e)))
@@ -1165,18 +1281,24 @@ module Make (Flags:OPSEM_FLAGS) = struct
       | E_sh e when (expr_is_value cfg e.data) -> { cfg with expr = e }
       | E_sh e -> stk_push cfg e (fun e -> astgen' (E_sh(e)))
 
-      | E_print e when (expr_is_value cfg e.data) -> 
-          print_string "PRINT: " ;
-          Ast.Pretty.pp_expr_nd e ;
-          print_string "\n" ;
-          { cfg with expr = g (E_value (gv(V_unit))) }
+      | E_print e when (expr_is_value cfg e.data) ->
+	let vndopt = close_value_of_expr cfg e.data in
+	begin
+	  match vndopt with
+	    | None -> raise (Stuck cfg)
+	    | Some(v) ->
+              print_string "PRINT: " ;
+              Ast.Pretty.pp_value_nd v ;
+              print_string "\n" ;
+              { cfg with expr = g (E_value (gv(V_unit))) }
+	end
 
       | E_print e -> stk_push cfg e (fun e -> astgen' (E_print(e)))
 
-      | E_sysop(vrnd, l) -> begin
+      | E_sysop(vrnd, typ_op, l) -> begin
 	let closed_vals = List.map (fun v -> close_value cfg v) l in
 	let Var(sysopname) = vrnd.data in
-	let v = exec_sysop sysopname closed_vals in
+        let v = exec_sysop sysopname typ_op closed_vals in
         { cfg with expr = astgen' (E_value v) }
       end
           

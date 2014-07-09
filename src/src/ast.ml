@@ -4,11 +4,19 @@ type arrloc = int
 exception NYI
 exception Impossible
 
+module Proc = Sysproc.Proc
+
   (* Set of principals *)
 module Ps = Set.Make(String)
 
   (* Variable names; distinct from constructor names, like in caml. *)
 type var = Var of string
+
+(*
+ * this variable is available to Wysteria programs, it can be
+ * accessed in parallel(p) mode where p is a singleton principal.
+ *)
+let _mevar = "__me__"
     
   (* Constructor names; lexically distinct from variable names, like in caml. *)
 type cons = Cons of string
@@ -49,6 +57,7 @@ and value =
   | V_arrloc   of arrloc
   | V_bool     of bool
   | V_nat      of int
+  | V_string   of string
   | V_unit
   | V_inj      of cons_nd * value_nd list
   | V_row      of ( field_nd * value_nd ) list
@@ -59,6 +68,7 @@ and value =
   | V_clos     of clos
   | V_wires    of (princ_nd * value_nd) list
   | V_sh       of char list
+  | V_proc     of Proc.t
 
   (* closures *)
 and clos = { clos_env : env ;
@@ -102,11 +112,11 @@ and eff =
 and typ_nd = typ astnd
 and typ =
   | T_unknown
-  | T_var  of var_nd
+  (*| T_var  of var_nd*)
   | T_wire of value_nd * typ_nd
   | T_sh   of value_nd * typ_nd
-  | T_appv of typ_nd * value_nd
-  | T_appt of typ_nd * typ_nd
+  (*| T_appv of typ_nd * value_nd*)
+  (*| T_appt of typ_nd * typ_nd*)
   | T_unit
   | T_nat
   | T_bool
@@ -115,7 +125,8 @@ and typ =
   | T_row of ( field_nd * typ_nd ) list
   | T_ps  of refine_nd
   | T_array of typ_nd
-
+  | T_proc
+  | T_string
 
   (* Lambdas; they appear in both [[expr]] and [[app]] sub-grammars. *)
 and lam_nd = lam astnd
@@ -142,7 +153,7 @@ and expr =
   | E_proj  of field_nd * expr_nd (* generalizes fst and snd to rows of data *)
   | E_natop of natop_nd * expr_nd * expr_nd (* Naturals -- operations *)
   | E_print of expr_nd (* printing *)
-  | E_sysop of var_nd * (value_nd list)
+  | E_sysop of var_nd * typ_nd option * (value_nd list)
 
   (* Arrays *)
   | E_array  of expr_nd * expr_nd
@@ -162,6 +173,8 @@ and expr =
   | E_waps  of value_nd * expr_nd * lam_nd          (* secure wire application *)
   | E_wfold of value_nd * expr_nd * expr_nd * lam_nd (* wire folding *)
   | E_paren of expr_nd
+
+  | E_cast of expr_nd * typ_nd
 
 and natop_nd = natop astnd
 and natop =
@@ -226,7 +239,7 @@ module Macros = struct
     let idxvar, idxpat = var, (pat_of_var var (gt T_nat)) in
     let jdxvar, jdxpat = fresh_var_pat' T_nat in
     let loopvar        = fresh_var () in
-    let looptyp        = gt (T_arr(None, gt(T_nat), geff(Ef_emp), gt(T_unit))) in
+    let looptyp        = gt (T_arr(Some idxvar, gt(T_nat), geff(Ef_emp), gt(T_unit))) in
     let fixexpr = 
       let fixbody = 
         g(E_cond ( 
@@ -319,6 +332,7 @@ type 'b value_maps = {
   v_bool     : bool -> 'b ;
   v_nat      : int -> 'b ;
   v_unit     : unit -> 'b ;
+  v_string   : string -> 'b ;
   v_inj      : cons_nd -> 'b list -> 'b;
   v_row      : ( field_nd * 'b ) list -> 'b;
   v_emp      : unit -> 'b ;
@@ -327,7 +341,8 @@ type 'b value_maps = {
   v_paren    : 'b -> 'b ;
   v_clos     : clos -> 'b ;
   v_wires    : (princ_nd * 'b) list -> 'b ;
-  v_sh       : char list -> 'b
+  v_sh       : char list -> 'b ;
+  v_proc     : Proc.t -> 'b
 }
 
 exception Missing_case of string
@@ -336,6 +351,9 @@ module AstMap : sig
   val map_value       : ( value_nd -> 'b value_maps ) -> value_nd -> 'b
   val copy_value      : value_nd -> value_nd
   val close_value_sel : (varval -> value_nd) -> value_nd -> value_nd
+  val close_typ_sel   : (varval -> value_nd) -> typ -> typ
+  val close_typnd_sel : (varval -> value_nd) -> typ_nd -> typ_nd
+  val close_place_sel : (varval -> value_nd) -> place_nd -> place_nd
   val close_value     : env -> value_nd -> value_nd
 
   val free_vars       : value_nd -> varval list
@@ -358,6 +376,7 @@ struct
     v_bool     = begin fun _      -> raise (Missing_case "v_bool") end ;
     v_nat      = begin fun _      -> raise (Missing_case "v_nat") end ;
     v_unit     = begin fun _      -> raise (Missing_case "v_unit") end ;
+    v_string   = begin fun _      -> raise (Missing_case "v_string") end ;
     v_inj      = begin fun _ _    -> raise (Missing_case "v_inj") end ;
     v_row      = begin fun _      -> raise (Missing_case "v_row") end ;
     v_emp      = begin fun _      -> raise (Missing_case "v_emp") end ;
@@ -367,6 +386,7 @@ struct
     v_clos     = begin fun _      -> raise (Missing_case "v_clos") end ;
     v_wires    = begin fun _      -> raise (Missing_case "v_wires") end ;
     v_sh       = begin fun _      -> raise (Missing_case "v_sh") end ;
+    v_proc     = begin fun _      -> raise (Missing_case "v_proc") end ;
   }
 
   let rec map_value = fun f v -> 
@@ -378,6 +398,7 @@ struct
       | V_bool b          -> f'.v_bool b
       | V_nat i           -> f'.v_nat i
       | V_unit            -> f'.v_unit ()
+      | V_string s        -> f'.v_string s
       | V_inj(c,vs)       -> f'.v_inj c (List.map (fun v -> map_value f v) vs)
       | V_row row         -> f'.v_row (List.map (fun (fld,v) -> (fld, map_value f v)) row)
       | V_emp             -> f'.v_emp ()
@@ -387,6 +408,7 @@ struct
       | V_clos c          -> f'.v_clos c
       | V_sh l            -> f'.v_sh l
       | V_wires pvs       -> f'.v_wires (List.map (fun (p,v) -> (p, map_value f v)) pvs)
+      | V_proc p          -> f'.v_proc p
 
   let copy_value_mapper value_nd =
     let astnd data = { value_nd with data = data } in {
@@ -396,6 +418,7 @@ struct
       v_bool     = begin fun b     -> astnd ( V_bool b ) end ;
       v_nat      = begin fun i     -> astnd ( V_nat i ) end ;
       v_unit     = begin fun _     -> astnd ( V_unit ) end ;
+      v_string   = begin fun s     -> astnd ( V_string s ) end ;
       v_inj      = begin fun c vs  -> astnd ( V_inj (c, vs) ) end ;
       v_row      = begin fun row   -> astnd ( V_row row ) end ;
       v_emp      = begin fun _     -> astnd ( V_emp ) end ;
@@ -405,18 +428,92 @@ struct
       v_clos     = begin fun c     -> astnd ( V_clos c ) end ;
       v_sh       = begin fun l     -> astnd ( V_sh l ) end ;
       v_wires    = begin fun pvs   -> astnd ( V_wires pvs ) end ;
+      v_proc     = begin fun p     -> astnd ( V_proc p ) end ;
     }
 
   let copy_value value_nd =
     map_value copy_value_mapper value_nd
 
     (* Close a value, selectively, using a custom function. *)
-  let close_value_sel closef value_nd =
+  (*let close_value_sel closef value_nd =
     let mapper value_nd =
       { (copy_value_mapper value_nd) with
         v_var = begin fun v -> closef (value_nd, v) end }
     in
-    map_value mapper value_nd
+    map_value mapper value_nd*)
+
+  let rec close_value_sel closef value_nd =
+    let closed_typ = close_typ_sel closef value_nd.info in
+    let cvdata =
+      match value_nd.data with
+	| V_princ(_)
+	| V_bool(_)
+	| V_nat(_)
+	| V_unit
+        | V_string(_)
+	| V_emp
+	| V_clos(_)
+	| V_sh(_)
+        | V_proc(_)
+	| V_arrloc(_) -> value_nd.data
+	| V_var(vnd) -> (closef (value_nd, vnd)).data
+	| V_inj(cnd, l) -> V_inj(cnd, List.map (fun vnd -> close_value_sel closef vnd) l)
+	| V_row(l) -> V_row(List.map (fun (fnd, vnd) -> (fnd, close_value_sel closef vnd)) l)
+	| V_ps_lit(l) -> V_ps_lit(List.map (fun vnd -> close_value_sel closef vnd) l)
+	| V_ps_union(v1, v2) -> V_ps_union(close_value_sel closef v1, close_value_sel closef v2)
+	| V_paren(v) -> V_paren(close_value_sel closef v)
+	| V_wires(l) -> V_wires(List.map (fun (pnd, vnd) -> (pnd, close_value_sel closef vnd)) l)
+    in
+    { prov = value_nd.prov; data = cvdata; info = closed_typ }
+      
+  and close_typ_sel closef typ =
+    let ctdata = match typ with
+      | T_unknown
+      | T_unit
+      | T_nat
+      | T_string
+      | T_proc
+      | T_bool -> typ
+      | T_wire(vnd, tnd) -> T_wire(close_value_sel closef vnd, close_typnd_sel closef tnd)
+      | T_sh(vnd, tnd) -> T_sh(close_value_sel closef vnd, close_typnd_sel closef tnd)
+      | T_arr(vopt, tnd_arg, effnd, tnd_ret) -> T_arr(vopt, close_typnd_sel closef tnd_arg,
+						      close_eff_sel closef effnd,
+						      close_typnd_sel closef tnd_ret)
+      | T_sum(l) ->
+	T_sum(List.map (fun (cnd, tnd_l) -> (cnd, List.map (fun tnd -> close_typnd_sel closef tnd) tnd_l)) l)
+      | T_row(l) -> T_row(List.map (fun (fnd, tnd) -> (fnd, close_typnd_sel closef tnd)) l)
+      | T_ps(rnd) -> T_ps(close_ref_sel closef rnd)
+      | T_array(tnd) -> T_array(close_typnd_sel closef tnd)
+    in
+    ctdata
+
+  and close_typnd_sel closef typ_nd = { typ_nd with data = close_typ_sel closef typ_nd.data }
+
+  and close_ref_sel closef ref_nd =
+    let crdata = match ref_nd.data with
+      | R_true
+      | R_singl -> ref_nd.data
+      | R_subeq(vnd) -> R_subeq(close_value_sel closef vnd)
+      | R_eq(vnd) -> R_eq(close_value_sel closef vnd)
+      | R_conj(r1, r2) -> R_conj(close_ref_sel closef r1, close_ref_sel closef r2)
+      | R_not(r) -> R_not(close_ref_sel closef r)
+    in
+    { ref_nd with data = crdata }
+	
+  and close_eff_sel closef eff_nd =
+    let cedata = match eff_nd.data with
+      | Ef_emp -> Ef_emp
+      | Ef_place(plnd) -> Ef_place(close_place_sel closef plnd)
+      | Ef_cat(eff1, eff2) -> Ef_cat(close_eff_sel closef eff1, close_eff_sel closef eff2)
+    in
+    { eff_nd with data = cedata }
+
+  and close_place_sel closef pl_nd =
+    let cpldata = match pl_nd.data with
+      | Pl_top -> Pl_top
+      | Pl_ps(mode_nd, vnd) -> Pl_ps(mode_nd, close_value_sel closef vnd)
+    in
+    { pl_nd with data = cpldata }
 
     (* Close a value by an environment (completely). *)
   let close_value env value_nd =
@@ -437,6 +534,7 @@ struct
       v_bool     = begin fun b     -> emp end ;
       v_nat      = begin fun i     -> emp end ;
       v_unit     = begin fun _     -> emp end ;
+      v_string   = begin fun s     -> emp end ;
       v_inj      = begin fun c vs  -> List.fold_left app emp vs end ;
       v_row      = begin fun row   -> List.fold_left app emp (List.map snd row) end ;
       v_emp      = begin fun _     -> emp end ;
@@ -446,6 +544,7 @@ struct
       v_clos     = begin fun c     -> emp end ;
       v_sh       = begin fun l     -> emp end ;
       v_wires    = begin fun pvs   -> List.fold_left app emp (List.map snd pvs) end ;
+      v_proc     = begin fun p     -> emp end ;
     } in
     (map_value free_vars_mapper value_nd)
 
@@ -462,6 +561,7 @@ struct
       v_princ    = begin fun p     -> emp end ;
       v_bool     = begin fun b     -> emp end ;
       v_nat      = begin fun i     -> emp end ;
+      v_string   = begin fun s     -> emp end ;
       v_unit     = begin fun _     -> emp end ;
       v_inj      = begin fun c vs  -> List.fold_left app emp vs end ;
       v_row      = begin fun row   -> List.fold_left app emp (List.map snd row) end ;
@@ -471,6 +571,7 @@ struct
       v_paren    = begin fun v     -> v   end ;
       v_clos     = begin fun c     -> emp end ;
       v_sh       = begin fun l     -> emp end ;
+      v_proc     = begin fun p     -> emp end ;
       v_wires    = begin fun pvs   -> List.fold_left app emp (List.map snd pvs) end ;
     } in
     (map_value free_vars_mapper value_nd)
@@ -548,7 +649,9 @@ type ('a,'b) expr_folders' = {
   e_app    : app_nd * expr_nd -> ('a * 'a * ('b -> 'b -> 'b)) ;
 (* printing -- *)
   e_print  : expr_nd -> ('a * ('b -> 'b)) ;
-  e_sysop  : var_nd * (value_nd list) -> 'b;
+  e_sysop  : var_nd * typ_nd option * (value_nd list) -> 'b;
+
+  e_cast   : expr_nd * typ_nd -> ('a * ('b -> 'b));
 }
     
 and ('a, 'b) expr_folders = 'a -> ('a, 'b) expr_folders'
@@ -708,7 +811,13 @@ let rec fold_expr : (expr_nd -> ('a,'b) expr_folders) -> expr_nd -> 'a -> 'b
           let y = fold_expr f e x in
           cont y
 
-      | E_sysop(v, l) -> f'.e_sysop(v, l)
+      | E_sysop(v, tyop, l) -> f'.e_sysop(v, tyop (* XXX: Does not visit the type *), l)
+
+      | E_cast(e,t) -> 
+        let x, cont = f'.e_cast(e,t) in
+        let y = fold_expr f e x in
+        cont y
+
     end
 
 let expr_copy_folders e : (unit, expr_nd) expr_folders = 
@@ -759,14 +868,16 @@ let expr_copy_folders e : (unit, expr_nd) expr_folders =
       e_app    = begin fun (a,e)          -> (), (), fun y1 y2 -> g(E_app(ga(A_app(app_of_exp y1, y2)))) end ;
       e_avar   = begin fun v              -> g(E_app(ga(A_var v))) end ;
       e_print  = begin fun e              -> (), fun y -> g(E_print y) end ;
-      e_sysop  = begin fun (vr,l)         -> g (E_sysop (vr, l)) end ;
+      e_sysop  = begin fun (vr,tyop,l)    -> g (E_sysop (vr, tyop, l)) end ;
+
+      e_cast   = begin fun (e,t)          -> (), fun y -> g(E_cast (y,t)) end ;   
     }
 
 (* NOTE!: Assumes that program variables are all unique! *)
 (* XXX *)
 (* To lift this restriction, feed through a set of bound variables; 
    do not substitute any variable int he bound set. *)
-let expr_close_sel closef e =
+(*let expr_close_sel closef e =
   let folders e x : (unit, expr_nd) expr_folders' = 
     { 
       (expr_copy_folders e x)
@@ -774,7 +885,71 @@ let expr_close_sel closef e =
         e_value = begin fun v -> 
           {e with data=E_value(AstMap.close_value_sel closef v)} end ;  }
   in
-  fold_expr folders e ()
+  fold_expr folders e ()*)
+
+let rec expr_close_sel closef e =
+  let closed_typ = AstMap.close_typ_sel closef e.info in
+  let edata = match e.data with
+    | E_value(vnd) -> E_value(AstMap.close_value_sel closef vnd)
+    | E_case(e1, l) ->
+      E_case(expr_close_sel closef e1,
+	     List.map (fun (cnd, plist, e2) -> (cnd, plist, expr_close_sel closef e2)) l)
+    | E_cond(e1, e2, e3) -> E_cond(expr_close_sel closef e1, expr_close_sel closef e2, expr_close_sel closef e3)
+    | E_let(patnd, plndopt, e1, e2) ->
+      let cplndopt = match plndopt with
+	| None -> None
+	| Some(p) -> Some(AstMap.close_place_sel closef p)
+      in
+      E_let(pat_close_sel closef patnd, cplndopt, expr_close_sel closef e1, expr_close_sel closef e2)
+    | E_app(appnd) -> E_app(app_close_sel closef appnd)
+    | E_proj(fnd, e1) -> E_proj(fnd, expr_close_sel closef e1)
+    | E_natop(opnd, e1, e2) -> E_natop(opnd, expr_close_sel closef e1, expr_close_sel closef e2)
+    | E_print(e1) -> E_print(expr_close_sel closef e1)
+    | E_sysop(varnd, tyop, l) -> E_sysop(varnd, tyop, List.map (fun vnd -> AstMap.close_value_sel closef vnd) l)
+    | E_array(e1, e2) -> E_array(expr_close_sel closef e1, expr_close_sel closef e2)
+    | E_select(e1, e2) -> E_select(expr_close_sel closef e1, expr_close_sel closef e2)
+    | E_update(e1, e2, e3) -> E_update(expr_close_sel closef e1, expr_close_sel closef e2, expr_close_sel closef e3)
+    | E_sh(e1) -> E_sh(expr_close_sel closef e1)
+    | E_comb(e1) -> E_comb(expr_close_sel closef e1)
+    | E_wire(e1, e2) -> E_wire(expr_close_sel closef e1, expr_close_sel closef e2)
+    | E_wcat(e1, e2) -> E_wcat(expr_close_sel closef e1, expr_close_sel closef e2)
+    | E_wcopy(e1, e2) -> E_wcopy(expr_close_sel closef e1, expr_close_sel closef e2)
+    | E_wproj(e1, e2) -> E_wproj(expr_close_sel closef e1, expr_close_sel closef e2)
+    | E_wapp(v, e1, e2) -> E_wapp(AstMap.close_value_sel closef v, expr_close_sel closef e1, expr_close_sel closef e2)
+    | E_waps(v, e1, lamnd) -> E_waps(AstMap.close_value_sel closef v, expr_close_sel closef e1,
+				     lam_close_sel closef lamnd)
+    | E_wfold(v, e1, e2, lamnd) -> E_wfold(AstMap.close_value_sel closef v, expr_close_sel closef e1,
+					   expr_close_sel closef e2, lam_close_sel closef lamnd)
+    | E_paren(e1) -> E_paren(expr_close_sel closef e1)
+
+    | E_cast(e1, t) -> E_cast(expr_close_sel closef e1, t)
+  in
+  { prov = e.prov; data = edata; info = closed_typ }
+
+and app_close_sel closef app =
+  let adata = match app.data with
+    | A_var(_) -> app.data (* NOTE: is this right or this var should close ? *)
+    | A_lam(lamnd) -> A_lam(lam_close_sel closef lamnd)
+    | A_app(app1, e) -> A_app(app_close_sel closef app1, expr_close_sel closef e)
+    | A_paren(app1) -> A_paren(app_close_sel closef app1)
+  in
+  { app with data = adata }
+
+and lam_close_sel closef lam =
+  let ldata = match lam.data with
+    | L_fix(vnd, tnd, patnd, exnd) -> L_fix(vnd, AstMap.close_typnd_sel closef tnd, pat_close_sel closef patnd,
+					    expr_close_sel closef exnd)
+    | L_lam(patnd, exnd) -> L_lam(pat_close_sel closef patnd, expr_close_sel closef exnd)
+  in
+  { lam with data = ldata }
+
+and pat_close_sel closef pat =
+  let pdata = match pat.data with
+    | P_var(v) -> pat.data
+    | P_cast(pat1, tnd) -> P_cast(pat_close_sel closef pat1, AstMap.close_typnd_sel closef tnd)
+    | P_row(l) -> P_row(List.map (fun (fnd, pat1) -> (fnd, pat_close_sel closef pat1)) l)
+  in
+  { pat with data = pdata }
 
 let expr_close env e =
   expr_close_sel     
@@ -824,7 +999,9 @@ let expr_free_vars' e : varval list -> varval list =
     e_app    = begin fun (a, e)          -> (), (), app end ;
     e_avar   = begin fun v               -> emp (* TODO -- not adding v *) end ;
     e_print  = begin fun e               -> (), fun y -> y end ;
-    e_sysop  = begin fun (vr, l)         -> List.fold_left (fun y v -> app y (AstMap.free_vars' v)) emp l end;
+    e_sysop  = begin fun (vr, tyop, l)   -> List.fold_left (fun y v -> app y (AstMap.free_vars' v)) emp l end;
+
+    e_cast   = begin fun (e, t)          -> (), fun y -> y end ;
   }
   in
   (fold_expr folders e ())
@@ -888,12 +1065,14 @@ let expr_free_var_set e  =
     e_app    = begin fun (a, e)          -> bv, bv, app end ;
     e_avar   = begin fun v               -> emp (* TODO -- not adding v; no value node *) end ;
     e_print  = begin fun e               -> bv, fun y -> y end ;
-    e_sysop  = begin fun (vr, l)         -> bv_filter bv (List.fold_left (fun y v -> app y (AstMap.free_var_set v)) emp l) end;
+    e_sysop  = begin fun (vr, tyop, l)   -> bv_filter bv (List.fold_left (fun y v -> app y (AstMap.free_var_set v)) emp l) end;
+
+    e_cast   = begin fun (e, t)        -> bv, fun y -> y end ;
   }
   in
   (fold_expr folders e BoundVars.empty)
 
-(* no reason for this to here *)
+(* no reason for this to be here *)
 module Library = struct
     
   exception CLibError of string
@@ -1017,6 +1196,7 @@ module Pretty = struct
     | V_bool false -> ps "false"
     | V_unit  -> ps "()"
     | V_nat n -> ps (string_of_int n)
+    | V_string s -> ps "\"" ; ps s (* XXX: Should escape the string *) ; ps "\""
     | V_inj(c,vs) -> 	
       pp_cons_nd c ;
       ( match vs with [] -> ()
@@ -1054,6 +1234,7 @@ module Pretty = struct
         pp_value_nd v
       end pvs ", " ;
       ps "]"
+    | V_proc p -> ps "proc<\'" ; ps (Proc.to_string p) ; ps "\'>"
 
   and pp_env sep_nxt env =
     ps "{" ;
@@ -1102,10 +1283,12 @@ module Pretty = struct
   and pp_typ_nd n = pp_typ n.data
   and pp_typ = function
     | T_unknown -> ps "unknown"
+    | T_proc -> ps "proc"
+    | T_string -> ps "string"
     | T_nat -> ps "nat"
     | T_bool -> ps "bool"
     | T_unit -> ps "unit"
-    | T_var v -> pp_var_nd v
+    (*| T_var v -> pp_var_nd v*)
     | T_wire (v,t) -> ps "W " ;
       pp_value_nd v ; pp_space () ;
       pp_typ_nd t
@@ -1113,8 +1296,8 @@ module Pretty = struct
       pp_value_nd v ; ps ":"; pp_typ (v.info); pp_space () ;
       pp_typ_nd t
     | T_array t -> ps "array " ; pp_typ_nd t
-    | T_appv (t, v) -> pp_typ_nd t ; pp_space () ; pp_value_nd v 
-    | T_appt (t1, t2) -> pp_typ_nd t1 ; pp_space () ; pp_typ_nd t2
+    (*| T_appv (t, v) -> pp_typ_nd t ; pp_space () ; pp_value_nd v *)
+    (*| T_appt (t1, t2) -> pp_typ_nd t1 ; pp_space () ; pp_typ_nd t2*)
     | T_arr (vo, t1, e, t2) ->      
       ( match vo with
         | None ->
@@ -1138,7 +1321,7 @@ module Pretty = struct
     | T_row rs ->
       ps "{" ;
       pp_list begin fun (f,t) ->
-        pp_field_nd f ; pp_space () ; pp_typ_nd t
+        pp_field_nd f ; ps ":" ; pp_typ_nd t
       end rs ", " ;
       ps "}" ;
     | T_ps r -> 
@@ -1283,10 +1466,17 @@ module Pretty = struct
     | E_print e ->
       ps "print " ;
       pp_expr_nd e
-    | E_sysop(vr, l) ->
-      ps "sysop ";
-      pp_var (vr.data);
-      ps " ";
+    | E_cast (e, t) -> 
+      ps "cast ";
+      pp_expr_nd e ; ps " ";
+      pp_typ_nd t
+    | E_sysop(vr, tyop, l) ->
+      ps "sysop "; 
+      pp_var (vr.data); ps " ";
+      begin match tyop with
+        | None -> ()
+        | Some t -> (pp_typ_nd t ; ps " ")
+      end ;
       List.iter (fun v -> pp_value_nd v; ps " ") l
 
 
@@ -1296,5 +1486,71 @@ module Pretty = struct
     | A_lam l -> pp_lam_nd l
     | A_app (a,e) -> ps "(" ; pp_app_nd a ; ps ")(" ; pp_expr_nd e ; ps ")"
     | A_paren a -> ps "(" ; pp_app_nd a ; ps ")"
+
+  (* ------------------------------------------------ *)
+  (* Serializing values as strings: *)
+  exception Not_supported
+
+  let rec string_of_value_nd v = 
+    string_of_value v.data
+
+  and string_of_value =
+    let ps s = s in
+    let (@@) a b = a ^ b in    
+    let rec string_of_list pr xs sep =
+      match xs with 
+        | []    -> ""
+        | x::[] -> pr x
+        | x::xs -> 
+            pr x @@
+              ps sep @@
+              string_of_list pr xs sep
+    in
+    function
+      | V_var v -> (raise Not_supported)
+      | V_clos c -> (raise Not_supported)
+      | V_arrloc l -> (raise Not_supported)
+
+      | V_princ {data=p} -> ps p
+      | V_bool true  -> ps "true"
+      | V_bool false -> ps "false"
+      | V_unit  -> ps "()"
+      | V_nat n -> ps (string_of_int n)
+      | V_string s -> ps "\"" @@ ps s (* XXX: Should escape the string *) @@ ps "\""
+      | V_inj(c,vs) -> 	
+          let (Cons c) = c.data in
+          ps c @@
+            ( match vs with [] -> ""
+                | vs -> ps " " @@ string_of_list string_of_value_nd vs " " )
+
+      | V_row r -> ps "{" @@
+          string_of_list (fun (f,v) -> 
+                     let (Field s) = f.data in
+                     ps s @@ 
+                     ps ":" @@
+                     string_of_value_nd v) r "," @@
+          ps "}"
+      | V_emp -> ps "{}"
+      | V_ps_lit vs -> ps "{" @@
+          string_of_list string_of_value_nd vs "," @@
+          ps "}"
+      | V_ps_union (v1,v2) -> 
+          string_of_value_nd v1 @@ 
+          ps " union " @@
+          string_of_value_nd v2
+      | V_paren v -> ps "(" @@
+          string_of_value_nd v @@
+          ps ")"
+      | V_sh l ->
+          ps "sh " @@ string_of_int (List.length l)
+      | V_wires pvs ->
+          ps "[" @@
+          string_of_list begin fun (p,v) ->
+            ps p.data @@
+            ps ":"@@
+            string_of_value_nd v
+          end pvs ", " @@
+          ps "]"
+      | V_proc p -> ps "proc<\'" @@ ps (Proc.to_string p) @@ ps "\'>"
 
 end (* Pretty module *)

@@ -87,9 +87,11 @@ let rec eqeff (eff1:eff_nd) (eff2:eff_nd) (env:tenv) :bool =
     | _ -> false
 
 let rec subtyp (t1:typ) (t2:typ) (plc:place_nd) (env:tenv) :bool = match t1, t2 with
-  | T_unit, T_unit
-  | T_nat, T_nat
-  | T_bool, T_bool -> true
+  | T_unit,   T_unit
+  | T_nat,    T_nat
+  | T_proc,   T_proc
+  | T_string, T_string
+  | T_bool,   T_bool -> true
 
   | T_sum(l1), T_sum(l2) ->
     begin
@@ -402,6 +404,8 @@ and wellformedref (r:refine_nd) (plc:place_nd) (env:tenv) :(refine_nd * bool) = 
 and wellformedtyp (t:typ) (plc:place_nd) (env:tenv) :(typ * bool) = match t with
   | T_unit
   | T_nat
+  | T_string
+  | T_proc
   | T_bool -> t, true
 
   | T_sum(l) ->
@@ -502,33 +506,41 @@ and typv (vnd:value_nd) (plc:place_nd) (env:tenv) :value_nd =
     match vnd.data with
       | V_var(varnd) ->
 	let s = varname varnd in
-	let {t = t; p = plc1} = lookupenv env varnd in
-	if not (snd (wellformedtyp t plc env)) then
-	  errf vnd.prov (fun _ -> print_string "Type "; pp_typ t;
-	    print_string (" for variable "^s^" is not well formed"))
-	    
-	else if not (del plc1 plc env) then
-	  errf vnd.prov (fun _ -> print_string "Variable "; print_string (s^" is bound at place ");
-	    pp_place_nd plc1; print_string " and cannot be used at current place ";
-	    pp_place_nd plc)
 
-	else if mode plc = Sec && not (secin t) then
-	  errf vnd.prov (fun _ -> print_string "Sec-in check failed for variable";
-	    print_string (s^", type "); pp_typ t; print_string " and place "; pp_place_nd plc)
+	if s = Ast._mevar then
+	  (* TODO: check that parallel(p) where singleton p *)
+	  tastnd vnd.prov vnd.data T_string
+	  
+	else
+	  let {t = t; p = plc1} = lookupenv env varnd in
+	  if not (snd (wellformedtyp t plc env)) then
+	    errf vnd.prov (fun _ -> print_string "Type "; pp_typ t;
+	      print_string (" for variable "^s^" is not well formed"))
+	      
+	  else if not (del plc1 plc env) then
+	    errf vnd.prov (fun _ -> print_string "Variable "; print_string (s^" is bound at place ");
+	      pp_place_nd plc1; print_string " and cannot be used at current place ";
+	      pp_place_nd plc)
 
-	else begin
-	  match t with
-	    | T_ps(r) ->
-	      let truerefnd = astnd vnd.prov R_true in
-	      let refvnd = tastnd vnd.prov vnd.data (T_ps(truerefnd)) in
-	      let eqrefnd = astnd vnd.prov (R_eq(refvnd)) in
-	      let conjnd = astnd vnd.prov (R_conj(r, eqrefnd)) in
-	      tastnd vnd.prov vnd.data (T_ps(conjnd))
-		
-	    | _ -> tastnd vnd.prov vnd.data t
-	end
+	  else if mode plc = Sec && not (secin t) then
+	    errf vnd.prov (fun _ -> print_string "Sec-in check failed for variable";
+	      print_string (s^", type "); pp_typ t; print_string " and place "; pp_place_nd plc)
+
+	  else begin
+	    match t with
+	      | T_ps(r) ->
+		let truerefnd = astnd vnd.prov R_true in
+		let refvnd = tastnd vnd.prov vnd.data (T_ps(truerefnd)) in
+		let eqrefnd = astnd vnd.prov (R_eq(refvnd)) in
+		let conjnd = astnd vnd.prov (R_conj(r, eqrefnd)) in
+		tastnd vnd.prov vnd.data (T_ps(conjnd))
+		  
+	      | _ -> tastnd vnd.prov vnd.data t
+	  end
 
       | V_nat(_) -> tastnd vnd.prov vnd.data T_nat
+	
+      | V_string(_) -> tastnd vnd.prov vnd.data T_string
 
       | V_bool(_) -> tastnd vnd.prov vnd.data T_bool
 
@@ -569,11 +581,13 @@ and typv (vnd:value_nd) (plc:place_nd) (env:tenv) :value_nd =
 	let tv = typv v plc env in
 	tastnd vnd.prov (V_paren(tv)) tv.info
 
+      | V_proc(_) -> tastnd vnd.prov vnd.data T_proc
+
       | _ ->
 	errf vnd.prov (fun _ ->
 	  print_string "Type checker not implemented for value "; pp_value_nd vnd)
 
-let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
+let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd * tenv) =
 
   let combeff2 eff1 eff2 prov = astnd prov (Ef_cat(eff1, eff2)) in
   let combeff3 eff1 eff2 eff3 prov = astnd prov (Ef_cat(eff1, (astnd prov (Ef_cat(eff2, eff3))))) in
@@ -583,15 +597,16 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
       let tvnd = typv vnd plc env in
       
       tastnd exnd.prov (E_value(tvnd)) tvnd.info,
-      astnd exnd.prov Ef_emp
+      astnd exnd.prov Ef_emp,
+      env
 
     | E_cond(e1, e2, e3) ->
       (*print_string "type checking :"; print_string "Cond, e1 = "; pp_expr_nd e1; print_string ", e2 = ";
       pp_expr_nd e2; print_string ", e3 = "; pp_expr_nd e3; print_newline ();*)
 
-      let te1, eff1 = typex e1 plc env in
-      let te2, eff2 = typex e2 plc env in
-      let te3, eff3 = typex e3 plc env in
+      let te1, eff1, _ = typex e1 plc env in
+      let te2, eff2, _ = typex e2 plc env in
+      let te3, eff3, _ = typex e3 plc env in
 
       if not (eqtyp te1.info T_bool plc env) then
 	errf exnd.prov (fun _ -> print_string "Condition "; pp_expr_nd te1;
@@ -614,10 +629,11 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 
 	else
 	  tastnd exnd.prov (E_cond(te1, te2, te3)) finaltyp,
-	  normalizeeff (combeff3 eff1 eff2 eff3 exnd.prov) plc env
+	  normalizeeff (combeff3 eff1 eff2 eff3 exnd.prov) plc env,
+	  env
 
     | E_proj(fldnd, rexnd) ->
-      let trexnd, eff = typex rexnd plc env in
+      let trexnd, eff, _ = typex rexnd plc env in
       
       let fname = fldname fldnd in
       
@@ -637,7 +653,7 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 	  pp_typ trexnd.info)
       in
       
-      tastnd exnd.prov (E_proj(fldnd, trexnd)) ftyp, normalizeeff eff plc env
+      tastnd exnd.prov (E_proj(fldnd, trexnd)) ftyp, normalizeeff eff plc env, env
       
     | E_let(patnd, plndopt, e1, e2) ->
       let getenvplc plc1 plc2 = match plc1.data, plc2.data with	
@@ -662,15 +678,16 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
       else
 	let vname = patvarname patnd in
       
-	let te1, eff1 = typex e1 plc1 env in	
-	let te2, eff2 = typex e2 plc ((vname, {t=te1.info; p=getenvplc plc plc1})::env) in
+	let te1, eff1, _ = typex e1 plc1 env in	
+	let te2, eff2, _ = typex e2 plc ((vname, {t=te1.info; p=getenvplc plc plc1})::env) in
 	
 	tastnd exnd.prov (E_let(patnd, Some(plc1), te1, te2)) te2.info,
-	normalizeeff (combeff3 eff eff1 eff2 exnd.prov) plc env
+	normalizeeff (combeff3 eff eff1 eff2 exnd.prov) plc env,
+	env
 
     | E_natop(opnd, e1, e2) ->
-      let te1, eff1 = typex e1 plc env in
-      let te2, eff2 = typex e2 plc env in
+      let te1, eff1, _ = typex e1 plc env in
+      let te2, eff2, _ = typex e2 plc env in
 
       if not (te1.info = T_nat) then
 	errf exnd.prov (fun _ -> print_string "Expression ";
@@ -681,7 +698,7 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 	errf exnd.prov (fun _ -> print_string "Expression ";
 	  pp_expr_nd te2; print_string " has type "; pp_typ te2.info;
 	  print_string " while expected T_nat")
-
+      
       else
 	let optyp = match opnd.data with
 	  | Natop_plus -> T_nat
@@ -691,10 +708,11 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 	in
 	
 	tastnd exnd.prov (E_natop(opnd, te1, te2)) optyp,
-	normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env
+	normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env,
+	env
 	
     | E_wire(e1, e2) ->
-      let te1, eff1 = typex e1 plc env in
+      let te1, eff1, _ = typex e1 plc env in
 
       let ve1 = match te1.data with
 	| E_value(v) -> v
@@ -719,7 +737,7 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 	    if mode plc = Sec then plc
 	    else astnd ve1.prov (Pl_ps(astnd ve1.prov Par, ve1))
 	  in
-	  let te2, eff2 = typex e2 plc1 env in
+	  let te2, eff2, _ = typex e2 plc1 env in
 
 	  if not (wirefree te2.info && sharefree te2.info) then
 	  errf exnd.prov (fun _ -> print_string "Wire range value type ";
@@ -732,11 +750,12 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 
 	else
 	  tastnd exnd.prov (E_wire(te1, te2)) (T_wire(ve1, (astnd te2.prov te2.info))),
-	  normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env
+	  normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env,
+	  env
 	
     | E_wproj(e1, e2) ->
-      let te1, eff1 = typex e1 plc env in
-      let te2, eff2 = typex e2 plc env in
+      let te1, eff1, _ = typex e1 plc env in
+      let te2, eff2, _ = typex e2 plc env in
       
       let vnddom, vtyp = match te1.info with
 	| T_wire(vnd, typnd) -> vnd, typnd.data
@@ -768,11 +787,12 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 
       else
 	tastnd exnd.prov (E_wproj(te1, te2)) vtyp,
-	normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env
+	normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env,
+	env
     
     | E_wcat(e1, e2) ->
-      let te1, eff1 = typex e1 plc env in
-      let te2, eff2 = typex e2 plc env in
+      let te1, eff1, _ = typex e1 plc env in
+      let te2, eff2, _ = typex e2 plc env in
 
       let (vnd1, vnd2, vtypnd) = match te1.info, te2.info with
 	| T_wire(v1, vtyp1), T_wire(v2, vtyp2) ->
@@ -799,14 +819,15 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
       else
 
 	tastnd exnd.prov (E_wcat(te1, te2)) (T_wire(tvnd, vtypnd)),
-	normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env
+	normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env,
+	env
 
     | E_wcopy(e1, e2) ->
       if mode plc = Sec then
 	err exnd.prov "Wcopy not allowed in Sec mode"
 
       else
-	let te1, eff1 = typex e1 plc env in
+	let te1, eff1, _ = typex e1 plc env in
 	
 	let v1 = match te1.data with
 	  | E_value(vnd) -> vnd
@@ -823,18 +844,20 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 
 	else
 	  let plc1 = astnd v1.prov (Pl_ps(astnd v1.prov Par, v1)) in
-	  let te2, eff2 = typex e2 plc1 env in
+	  let te2, eff2, _ = typex e2 plc1 env in
 	  tastnd exnd.prov (E_wcopy(te1, te2)) te2.info,
-	  normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env      
+	  normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env,
+	  env
       
     | E_app(appnd) ->
-      let tappnd, eff = typapp appnd plc env in
+      let tappnd, eff, _ = typapp appnd plc env in
       tastnd exnd.prov (E_app(tappnd)) tappnd.info,
-      normalizeeff eff plc env
+      normalizeeff eff plc env,
+      env
 
     | E_array(lexnd, vexnd) ->
-      let tlexnd, eff1 = typex lexnd plc env in
-      let tvexnd, eff2 = typex vexnd plc env in
+      let tlexnd, eff1, _ = typex lexnd plc env in
+      let tvexnd, eff2, _ = typex vexnd plc env in
       
       if not (eqtyp tlexnd.info T_nat plc env) then
 	errf exnd.prov (fun _ -> print_string "Array first argument ";
@@ -844,11 +867,12 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
       else
 	let btypnd = astnd exnd.prov tvexnd.info in
 	tastnd exnd.prov (E_array(tlexnd, tvexnd)) (T_array(btypnd)),
-	normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env
+	normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env,
+	env
 
     | E_select(arrexnd, indexnd) ->
-      let tarrexnd, eff1 = typex arrexnd plc env in
-      let tindexnd, eff2 = typex indexnd plc env in
+      let tarrexnd, eff1, _ = typex arrexnd plc env in
+      let tindexnd, eff2, _ = typex indexnd plc env in
 
       let bt = 
 	match tarrexnd.info with
@@ -865,12 +889,13 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 
       else
 	tastnd exnd.prov (E_select(tarrexnd, tindexnd)) bt,
-	normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env
+	normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env,
+	env
 	
     | E_update(arrexnd, indexnd, vexnd) ->
-      let tarrexnd, eff1 = typex arrexnd plc env in
-      let tindexnd, eff2 = typex indexnd plc env in
-      let tvexnd,   eff3 = typex vexnd plc env in
+      let tarrexnd, eff1, _ = typex arrexnd plc env in
+      let tindexnd, eff2, _ = typex indexnd plc env in
+      let tvexnd,   eff3, _ = typex vexnd plc env in
 
       let bt =
 	match tarrexnd.info with
@@ -886,14 +911,15 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 	  pp_expr_nd tindexnd; print_string " has type "; pp_typ tindexnd.info;
 	  print_string " while expected a T_nat")
 
-      else if not (eqtyp tvexnd.info bt plc env) then
+      else if not (subtyp tvexnd.info bt plc env) then
 	errf exnd.prov (fun _ -> print_string "Array has base type ";
 	  pp_typ bt; print_string " while update value "; pp_expr_nd tvexnd;
 	  print_string " has type "; pp_typ tvexnd.info)
 
       else
 	tastnd exnd.prov (E_update(tarrexnd, tindexnd, tvexnd)) T_unit,
-	normalizeeff (combeff3 eff1 eff2 eff3 exnd.prov) plc env
+	normalizeeff (combeff3 eff1 eff2 eff3 exnd.prov) plc env,
+	env
 
     | E_wapp(vnd, vwireexnd, lamwireexnd) ->
       if not (mode plc = Par) then
@@ -901,8 +927,8 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 	  
       else
 	let tvnd = typv vnd plc env in
-	let tvwireexnd, eff1 = typex vwireexnd plc env in
-	let tlamwireexnd, eff2 = typex lamwireexnd plc env in
+	let tvwireexnd, eff1, _ = typex vwireexnd plc env in
+	let tlamwireexnd, eff2, _ = typex lamwireexnd plc env in
 
 	if not (isprinctyp tvnd) then
 	  errf exnd.prov (fun _ -> print_string "Wapp first argument ";
@@ -961,7 +987,8 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 
 	  else
 	    tastnd exnd.prov (E_wapp(tvnd, tvwireexnd, tlamwireexnd)) (T_wire(tvnd, rettypnd)),
-	    normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env
+	    normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env,
+	    env
 
     | E_wfold(vnd, wirexnd, accumexnd, lamnd) ->
       if not (mode plc = Sec) then
@@ -969,9 +996,9 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 
       else
 	let tvnd = typv vnd plc env in
-	let twireexnd, eff1 = typex wirexnd plc env in
-	let taccumexnd, eff2 = typex accumexnd plc env in
-	let tlamnd, eff3 = typlam lamnd plc env in
+	let twireexnd, eff1, _ = typex wirexnd plc env in
+	let taccumexnd, eff2, _ = typex accumexnd plc env in
+	let tlamnd, eff3, _ = typlam lamnd plc env in
 
 	if not (isprinctyp tvnd) then
 	  errf exnd.prov (fun _ -> print_string "Wfold first argument ";
@@ -1043,7 +1070,8 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 			  pp_typ taccumexnd.info)
 		    in
 		    tastnd exnd.prov (E_wfold(tvnd, twireexnd, taccumexnd, tlamnd)) finaltyp,
-		    normalizeeff (combeff3 eff1 eff2 eff3 exnd.prov) plc env
+		    normalizeeff (combeff3 eff1 eff2 eff3 exnd.prov) plc env,
+		    env
 
 	      | _ -> errf exnd.prov (fun _ -> print_string "Wfold function type ";
 		pp_typ tlamnd.info; print_string " is not t1 -> t2 -> t3 -> t4")
@@ -1055,8 +1083,8 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 
       else
 	let tvnd = typv vnd plc env in
-	let twireexnd, eff1 = typex wirexnd plc env in
-	let tlamnd, eff2 = typlam lamnd plc env in
+	let twireexnd, eff1, _ = typex wirexnd plc env in
+	let tlamnd, eff2, _ = typlam lamnd plc env in
 
 	if not (isprinctyp tvnd) then
 	  errf exnd.prov (fun _ -> print_string "Waps first argument ";
@@ -1093,14 +1121,15 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 		  
 	      else
 		tastnd exnd.prov (E_waps(tvnd, twireexnd, tlamnd)) (T_wire(tvnd, t2)),
-		normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env
+		normalizeeff (combeff2 eff1 eff2 exnd.prov) plc env,
+		env
 
 	    | _ -> errf exnd.prov (fun _ -> print_string "Waps function argument has type ";
 	      pp_typ tlamnd.info; print_string " while expected a t1 -> t2")
 	end
 	  
     | E_sh(vexnd) ->
-      let tvexnd, eff = typex vexnd plc env in
+      let tvexnd, eff, _ = typex vexnd plc env in
       let btypnd = astnd exnd.prov tvexnd.info in
 
       if not (mode plc = Sec) then
@@ -1115,12 +1144,12 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 	begin
 	  match plc.data with
 	    | Pl_ps(_, vnd) ->
-	      tastnd exnd.prov (E_sh(tvexnd)) (T_sh(vnd, btypnd)), eff
+	      tastnd exnd.prov (E_sh(tvexnd)) (T_sh(vnd, btypnd)), eff, env
 	    | _ -> err exnd.prov "Impossible to reach here"
 	end
 
     | E_comb(vexnd) ->
-      let tvexnd, eff = typex vexnd plc env in
+      let tvexnd, eff, _ = typex vexnd plc env in
       
       if not (mode plc = Sec) then
 	err exnd.prov "Shares can only be combined in Sec mode"
@@ -1140,7 +1169,7 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 			pp_typ vnd1.info)
 
 		    else
-		      tastnd exnd.prov (E_comb(tvexnd)) btypnd.data, eff
+		      tastnd exnd.prov (E_comb(tvexnd)) btypnd.data, eff, env
 			
 		  | _ -> err exnd.prov "Impossible code"
 	      end
@@ -1151,18 +1180,29 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 	end
 
     | E_paren(e) ->
-      let te, eff = typex e plc env in
-      tastnd exnd.prov (E_paren(te)) te.info, eff
+      let te, eff, _ = typex e plc env in
+      tastnd exnd.prov (E_paren(te)) te.info, eff, env
+
+    | E_cast(e, t) ->
+      let te, eff, _ = typex e plc env in
+
+      if not (subtyp te.info t.data plc env) then
+	errf te.prov (fun _ ->
+	  print_string "cast type error: type "; pp_typ te.info; print_string " is not a subtype of "; pp_typ t.data)
+
+      else
+	tastnd exnd.prov (E_cast(te, t)) t.data, eff, env
 
     | E_print e ->
-      let te, eff = typex e plc env in
-      tastnd exnd.prov (E_print(te)) T_unit, eff
+      let te, eff, _ = typex e plc env in
+      tastnd exnd.prov (E_print(te)) T_unit, eff, env
 
-    | E_sysop(varnd, l) ->
+    | E_sysop(varnd, typop, l) ->
       let opname = varname varnd in
-      if varname varnd = "rand" then
-	match l with
-	  | [v] ->
+
+      if opname = "rand" then
+	match typop, l with
+	  | None, [v] ->
 	    let tv = typv v plc env in
 	    if not (tv.info = T_nat) then
 	      errf tv.prov (fun _ ->
@@ -1170,18 +1210,121 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd) =
 		pp_value_nd tv; print_string " has type "; pp_typ tv.info)
 
 	    else
-	      tastnd exnd.prov (E_sysop(varnd, [tv])) T_nat,
-	      astnd exnd.prov Ef_emp
+	      tastnd exnd.prov (E_sysop(varnd, typop, [tv])) T_nat,
+	      astnd exnd.prov Ef_emp,
+	      env
 	  | _ -> errf exnd.prov (fun _ ->
-	    print_string "rand expects a single argument of type nat while found ";
+	    print_string "rand expects no type and a single argument of type T_nat while found ";
 	    print_int (List.length l); print_string " arguments")
+
+      else if opname = "run" then
+	match typop, l with
+	  | None, [v] ->
+	    let tv = typv v plc env in
+	    if not (tv.info = T_string) then
+	      errf tv.prov (fun _ ->
+		print_string "run expects an argument of type T_string while value ";
+		pp_value_nd tv; print_string " has type "; pp_typ tv.info)
+
+	    else
+	      tastnd exnd.prov (E_sysop(varnd, typop, [tv])) T_proc,
+	      astnd exnd.prov Ef_emp,
+	      env
+	  | _ -> errf exnd.prov (fun _ ->
+	    print_string "run expects no type and a single argument of type T_string while found ";
+	    print_int (List.length l); print_string " arguments")
+
+      else if opname = "send" then
+	match typop, l with
+	  | None, v::l' ->
+	    let tv = typv v plc env in
+	    if not (tv.info = T_proc) then
+	      errf tv.prov (fun _ ->
+		print_string "send expects first argument of type T_proc while value ";
+		pp_value_nd tv; print_string " has type "; pp_typ tv.info)
+	    else
+	      let l' = List.map (fun v -> typv v plc env) l' in
+	      tastnd exnd.prov (E_sysop(varnd, typop, tv::l')) T_unit,
+	      astnd exnd.prov Ef_emp,
+	    env	      
+	  | _ -> errf exnd.prov (fun _ ->
+	    print_string "send expects no type and list of values")	    
+
+      else if opname = "recv" then
+	match typop, l with
+	  | Some(typ), [v] ->
+	    let tv = typv v plc env in
+	    if not (tv.info = T_proc) then
+	      errf tv.prov (fun _ ->
+		print_string "recv expects a type and an argument of type T_proc while value ";
+		pp_value_nd tv; print_string " has type "; pp_typ tv.info)
+
+	    else
+	      tastnd exnd.prov (E_sysop(varnd, typop, [tv])) typ.data,
+	      astnd exnd.prov Ef_emp,
+	      env
+	  | _ -> errf exnd.prov (fun _ ->
+	    print_string "recv expects a type and a single argument of type T_proc while found ";
+	    print_int (List.length l); print_string " arguments")
+
+      else if opname = "ignore" then
+	match typop, l with
+	  | None, [v] ->
+	    let tv = typv v plc env in
+	    if not (tv.info = T_proc) then
+	      errf tv.prov (fun _ ->
+		print_string "ignore expects an argument of type T_proc while value ";
+		pp_value_nd tv; print_string " has type "; pp_typ tv.info)
+
+	    else
+	      tastnd exnd.prov (E_sysop(varnd, typop, [tv])) T_unit,
+	      astnd exnd.prov Ef_emp,
+	      env
+	  | _ -> errf exnd.prov (fun _ ->
+	    print_string "ignore expects a single argument of type T_proc while found ";
+	    print_int (List.length l); print_string " arguments")
+
+      else if opname = "stop" then
+        match typop, l with
+          | None, [v] ->
+	    let tv = typv v plc env in
+	    if not (tv.info = T_proc) then
+	      errf tv.prov (fun _ ->
+		print_string "stop expects a type and an argument of type T_proc while value ";
+		pp_value_nd tv; print_string " has type "; pp_typ tv.info)
+
+	    else
+	      tastnd exnd.prov (E_sysop(varnd, typop, [tv])) T_unit,
+	      astnd exnd.prov Ef_emp,
+	      env
+	  | _ -> errf exnd.prov (fun _ ->
+	    print_string "stop expects a single argument of type T_proc while found ";
+	    print_int (List.length l); print_string " arguments")
+
+      else if opname = "strcat" then
+	match typop, l with
+	  | None, [v1; v2] ->
+	    let tv1 = typv v1 plc env in
+	    let tv2 = typv v2 plc env in
+	    if not (tv1.info = T_string && tv2.info = T_string) then
+	      errf tv1.prov (fun _ ->
+		print_string "strcat expects arguments of type T_string while value ";
+		pp_value_nd tv1; print_string " has type "; pp_typ tv1.info; print_string " and value "; pp_value_nd tv2; print_string " has type "; pp_typ tv2.info)
+	    else
+	      tastnd exnd.prov (E_sysop(varnd, typop, [tv1; tv2])) T_string,
+	      astnd exnd.prov Ef_emp,
+	      env
+	  | _ -> errf exnd.prov (fun _ ->
+	    print_string "strcat expects a two arguments of type T_string while found ";
+	    print_int (List.length l); print_string " arguments")	    
+
       else
 	errf exnd.prov (fun _ -> print_string ("Sysop " ^ opname ^ " not supported"))
       
     | _ -> errf exnd.prov (fun _ -> print_string "Type checker could not type ";
       pp_expr_nd exnd)
 
-and typlam (lamnd:lam_nd) (plc:place_nd) (env:tenv) :(lam_nd * eff_nd) =
+and typlam (lamnd:lam_nd) (plc:place_nd) (env:tenv) :(lam_nd * eff_nd * tenv) =
   match lamnd.data with
     | L_lam(patnd, exnd) ->
       begin
@@ -1204,9 +1347,9 @@ and typlam (lamnd:lam_nd) (plc:place_nd) (env:tenv) :(lam_nd * eff_nd) =
 	      let ttypnd = astnd typnd.prov t in
 	      let tpatnd = astnd patnd.prov (P_cast(xpatnd, ttypnd)) in
 	      let varname = varname varnd in
-	      let texnd, eff = typex exnd plc ((varname, {t=t; p=plc})::env) in
+	      let texnd, eff, _ = typex exnd plc ((varname, {t=t; p=plc})::env) in
 	      let rettypnd = astnd lamnd.prov texnd.info in
-	      tastnd lamnd.prov (L_lam(tpatnd, texnd)) (T_arr(Some(varnd), ttypnd, eff, rettypnd)), astnd lamnd.prov Ef_emp
+	      tastnd lamnd.prov (L_lam(tpatnd, texnd)) (T_arr(Some(varnd), ttypnd, eff, rettypnd)), astnd lamnd.prov Ef_emp, env
 
 	  | _ -> errf lamnd.prov (fun _ -> print_string "Pattern ";
 	    pp_pat_nd patnd; print_string " is not supported in type checker (missing type annotation?)")
@@ -1222,7 +1365,7 @@ and typlam (lamnd:lam_nd) (plc:place_nd) (env:tenv) :(lam_nd * eff_nd) =
 	  pp_typ typnd.data; print_string " is not well-formed")
 
       else
-	let tlamnd, eff = typlam tmplamnd plc ((fvarname, {t = t; p = plc})::env) in
+	let tlamnd, eff, _ = typlam tmplamnd plc ((fvarname, {t = t; p = plc})::env) in
 	if not (eqtyp tlamnd.info t plc env) then
 	  errf lamnd.prov (fun _ -> print_string "Fix annotation type ";
 	    pp_typ t; print_string " is not same as inner lambda type ";
@@ -1243,28 +1386,28 @@ and typlam (lamnd:lam_nd) (plc:place_nd) (env:tenv) :(lam_nd * eff_nd) =
 		      | L_lam(p, e) -> p, e
 		      | _ -> err lamnd.prov "Impossible code"
 		  in
-		  tastnd lamnd.prov (L_fix(varnd, astnd typnd.prov t, tpatnd, texnd)) t, eff
+		  tastnd lamnd.prov (L_fix(varnd, astnd typnd.prov t, tpatnd, texnd)) t, eff, env
 
 	      | _ -> errf lamnd.prov (fun _ -> print_string "Fix inner type ";
 		pp_typ t; print_string " is not an arrow type")
 	  end
 
-and typapp (appnd:app_nd) (plc:place_nd) (env:tenv) :(app_nd * eff_nd) =
+and typapp (appnd:app_nd) (plc:place_nd) (env:tenv) :(app_nd * eff_nd * tenv) =
   let combeff3 eff1 eff2 eff3 prov = astnd prov (Ef_cat(eff1, (astnd prov (Ef_cat(eff2, eff3))))) in
 
   match appnd.data with
     | A_var(varnd) ->
       let vnd = astnd appnd.prov (V_var(varnd)) in
       let tvnd = typv vnd plc env in
-      tastnd appnd.prov appnd.data tvnd.info, astnd appnd.prov Ef_emp
+      tastnd appnd.prov appnd.data tvnd.info, astnd appnd.prov Ef_emp, env
 
     | A_lam(lamnd) ->
-      let tlamnd, eff = typlam lamnd plc env in
-      tastnd appnd.prov (A_lam(tlamnd)) tlamnd.info, eff
+      let tlamnd, eff, _ = typlam lamnd plc env in
+      tastnd appnd.prov (A_lam(tlamnd)) tlamnd.info, eff, env
 
     | A_app(appnd, exnd) ->      
-      let tappnd, eff1 = typapp appnd plc env in
-      let texnd, eff2 = typex exnd plc env in
+      let tappnd, eff1, _ = typapp appnd plc env in
+      let texnd, eff2, _ = typex exnd plc env in
 
       let argvnd = match texnd.data with
 	| E_value(vnd) -> vnd
@@ -1294,7 +1437,8 @@ and typapp (appnd:app_nd) (plc:place_nd) (env:tenv) :(app_nd * eff_nd) =
 
 	    else
 	      tastnd appnd.prov (A_app(tappnd, texnd)) nret,
-	      normalizeeff (combeff3 eff1 eff2 neff appnd.prov) plc env
+	      normalizeeff (combeff3 eff1 eff2 neff appnd.prov) plc env,
+	      env
 	      
 	  | _ -> errf appnd.prov (fun _ -> print_string "Application function ";
 	    pp_app_nd tappnd; print_string " has type "; pp_typ tappnd.info;
@@ -1303,8 +1447,8 @@ and typapp (appnd:app_nd) (plc:place_nd) (env:tenv) :(app_nd * eff_nd) =
       end
 
     | A_paren(app) ->
-      let tapp, eff = typapp app plc env in
-      tastnd appnd.prov (A_paren(tapp)) tapp.info, eff
+      let tapp, eff, _ = typapp app plc env in
+      tastnd appnd.prov (A_paren(tapp)) tapp.info, eff, env
 
 and typplcnd plcnd plc env = match plcnd.data with
   | Pl_top -> plcnd

@@ -1,0 +1,363 @@
+(*let _ = print "Check rand argument" in*)
+
+let rand = \(myunit:unit). sysop rand 52 in
+
+let mkdeal =  \(x:ps{true}).
+
+  let dummy = wire x:0 in
+  let zerosh @ par(x) =  (* GMW bug, needs inputs for each party and AND gates *)
+    let y = dummy in
+    let y1 = 2 + 2 in
+    let zerosh1 @ sec(x) = makesh 0 in
+    zerosh1
+  in
+
+  let dealt @ par(x)  = array [ 52 ] of zerosh in
+  let ndealt @ par(x) = array [ 1 ] of 0 in
+  
+  let deal = \(tgt:ps{singl and subeq x}).
+
+    let w @ par(x) =
+      let check = \(rs:W x nat). (* check if sum of these random numbers is already dealt *)
+        let nd = select ndealt[0] in
+        let sum @ sec(x) = 
+          let s = wfold x [rs; 0; \(n1:nat).\(p:ps{true}).\(n2:nat). n1 + n2 ] in
+          let w_dummy = wire x:() in
+          let s1 = wfold x [w_dummy; s; \(n1:nat).\(p:ps{true}).\(n2:unit).
+                                        if n1 > 51 then n1 - 51 else n1
+                           ] in
+          makesh s1
+        in
+
+        let checkloop = 
+          fix checkloop:(i:nat) -> {#sum:Sh x nat, #success: bool}. (i:nat).
+            if i = nd then 
+              {#sum:sum, #success:true}
+            else
+              let sd = select dealt[i] in
+	      let dummy2 = wire x:0 in
+              let cmp @ sec(x) = 
+		let y = dummy2 in
+		let tmp1 = combsh sd in
+		let tmp2 = combsh sum in
+		tmp1 = tmp2
+              in
+	      if cmp then
+		{#sum:sum, #success:false}
+	      else
+		let j = i + 1 in
+		checkloop j
+	in (* end checkloop *)
+	checkloop 0
+      in (* end check *)
+
+      let retryloop = 
+        fix retryloop: (tmp5:unit) -> W tgt nat. (tmp5:unit).
+        let myrand = \(z:unit).rand () in
+        let rs = wapp x [wire x:(); wire x:myrand] in
+	let res = check rs in
+	if res.#success then
+          let nd   = select ndealt[0] in
+          let tmp6 = update dealt [nd] <- res.#sum in
+          let tmp7 = update ndealt [0] <- nd + 1 in
+	  let dummy1 = wire x:0 in
+          let card @ sec(x) = 
+	    let y = dummy1 in
+	    let y1 = 2 + 2 in
+            let s = combsh (res.#sum) in
+            wire tgt:s
+          in
+          card
+	else
+	  (*let _ = print 1111 in*)
+          retryloop ()
+      in (* end retryloop *)
+      retryloop ()
+    in (* end w *)
+
+    wcopy as x from w (* end lambda *)
+  in (* end let deal = *)
+
+  let reveal = \(i:nat) .
+               let card_sh @ par(x) = select dealt[i] in
+	       let dummy4 = wire x:0 in
+	       let w1 @ par(x) =
+		 let w2 @ sec(x) =
+		   let y2 = dummy4 in
+		   let n3 = 2 + 2 in
+		   let card = combsh card_sh in
+		   wire x:card
+		 in
+		 w2
+	       in
+	       wcopy as x from w1
+  in
+
+  let verify = \(z:ps{singl and subeq x}). \(w:W z nat) . \(i:nat) .
+    let card_sh @ par(x) = select dealt[i] in
+    let dummy3 = wire x:0 in
+    let cmp1 @ par(x) =
+      let cmp @ sec(x) =
+	let y = dummy3 in
+	let card_arr = combsh card_sh in
+	let card = w[z] in
+	let b = card = card_arr in
+	wire x:b
+      in
+      cmp
+    in
+    wcopy as x from cmp1
+  in 
+
+  let get_ndealt = \(z:unit) .
+    let w @ par(x) =
+      let n = select ndealt[0] in
+      wire x:n
+    in
+    wcopy as x from w
+  in
+
+  { #deal : deal, #verify : verify, #reveal : reveal, #get_ndealt : get_ndealt }
+in (* end mkdeal *)
+
+(* all the players *)
+let num_players = 3 in
+let players = { !Alice, !Bob, !Charlie } in
+
+let players_array = array [ num_players ] of (cast !Alice ps{singl and subeq players}) in
+let _ = update players_array [1] <- !Bob in
+let _ = update players_array [2] <- !Charlie in
+(* this is the end of non-generic code *)
+
+
+let racketportfile = sysop strcat "racketport_" __me__ in
+let racketportreadcmd = sysop strcat "cat < " racketportfile in
+
+let racketport =
+  let fh = sysop run racketportreadcmd in
+  sysop recv string fh
+in
+
+let cmdname = sysop strcat "racket examples/rkt/poker.rkt " racketport in
+
+(*let cmdname = sysop strcat "./a.out " __me__ in*)
+
+let term = sysop run cmdname in
+
+let notify_term = \(x:ps{true}) . \(y:W x nat) .
+                  let _ = sysop send term y in
+		  ()
+in 
+let end_term = \(x:unit) . sysop stop term in
+
+
+(* 3 card poker *)
+let n = 5 in
+
+(* default array of card ids *)
+(*let default_card_ids = array [ n ] of (wire players:0) in*)
+
+(* array of card ids for each player *)
+(*let card_ids = array [num_players] of default_card_ids in*)
+
+(* send the number of players, and name of each player to racket *)
+let _ = sysop send term num_players in
+
+let _ =
+  let fixfn = fix f : (i:nat) -> unit . (i:nat) .
+    if i = num_players then
+      ()
+    else
+      let pname = select players_array [i] in
+      let _ = sysop send term pname in
+      let next_i = i + 1 in
+      f next_i
+  in
+  fixfn 0
+in
+
+(* send my name *)
+let _ = sysop send term __me__ in
+
+(* for the first player, send the showdealbutton message *)
+let _ =
+  let fixfn = fix f : (i:nat) -> unit . (i:nat) .
+    if i = num_players then
+      ()
+    else
+      let pname = select players_array [i] in
+      let msg = if i = 0 then "showbtn" else "showbtn" in
+      let tmp10 @ par(pname) = sysop send term msg in
+      let next_i = i + 1 in
+      f next_i
+  in
+  fixfn 0
+in
+
+(* first player now stuck at receiving the msg to deal cards *)
+let firstplayer = select players_array [0] in
+(*let tmp11@par(firstplayer) =*)
+let _ =
+  (*let _ = sysop ignore term in*)
+  let _ = sysop ignore term in
+  ()
+in
+
+let deal_fns = mkdeal players in
+
+let deal = deal_fns.#deal in
+(*let get_ndealt = deal_fns.#get_ndealt in*)
+let reveal = deal_fns.#reveal in
+
+(* deal n cards to each player *)
+let deal_initial_cards =
+  fix fi : (i : nat) -> unit . (i : nat) .
+    if i = n then
+      ()
+    else
+      let fj = fix fj : (j : nat) -> unit . (j : nat) .
+	         if j = num_players then
+		   let next_i = i + 1 in
+		   fi next_i
+		 else
+		   (*let curr = get_ndealt () in *)
+		   let tgt = select players_array [j] in
+		   let c = deal tgt in
+		   let t3 @ par(tgt) = (notify_term tgt) c in
+		   (*let pl_card_ids = select card_ids [j] in
+		   let _ = update pl_card_ids [i] <- curr in*)
+		   let next_j = j + 1 in
+		   fj next_j
+      in
+      fj 0
+in
+
+(*end_term ()*)
+
+(* assume bet amounts maintained by racket code *)
+
+let bet_changed = array [num_players] of true in
+let fold_status = array [num_players] of false in
+
+let bet_complete = \(x:unit) .
+                   let fixfn = fix f : (i : nat) -> bool . (i : nat) .
+		               if i = num_players then
+				 true
+			       else
+				 let b1 = select bet_changed [i] in
+				 if b1 then
+				   false
+				 else
+				   let next_i = i + 1 in
+				   f next_i
+		   in
+		   fixfn 0
+in 
+
+let reset_bet_changed = \(x:unit) .
+                        let fixfn = fix f : (i : nat) -> unit . (i : nat) .
+			            if i = num_players then
+				      ()
+				    else
+				      let _ = update bet_changed [i] <- false in
+				      let next_i = i + 1 in
+				      f next_i
+			in
+			fixfn 0
+in
+
+let bet_rounds =
+  fix f : (x : unit) -> unit . (x : unit) .
+              if bet_complete () then
+		()
+	      else
+		let _ = reset_bet_changed () in
+		let plloop = fix g : (i : nat) -> unit . (i : nat) .
+		             if i = num_players then
+			       f ()
+			     else
+			       let tgt = select players_array [i] in
+			       let tgt_fold = select fold_status [i] in
+			       if tgt_fold then
+				 let next_i = i + 1 in
+				 g next_i
+			       else
+				 let amt @ par(tgt) =
+				   let _ = sysop send term "getinp" in
+				   let n = sysop recv nat term in
+				   n
+				 in
+			       (* go in a secure block, send this value to all *)
+			       (* amt = 0 means pass, amt = 100 means fold *)
+				 let amt_wire = wire tgt:amt in
+				 let amt_par @ par(players) =
+				   let dummy1 = wire players:0 in
+				   let amt_sec @ sec(players) =
+				     let y1 = dummy1 in
+				     let n1 = 2 + 2 in
+				     let tmp = amt_wire[tgt] in
+				     wire players:tmp
+				   in
+				   amt_sec
+				 in
+
+				 let t @ par(players) =
+				   let _ = sysop send term tgt in
+				   wapp players [amt_par; wire players:(\(x:nat).
+                                                 sysop send term x)]
+				 in
+
+				 let t1 @ par(players) =
+				   wapp players [amt_par; wire players:(\(x:nat).
+				                 if x = 0 then
+						   ()
+						 else if x = 100 then
+						   let _ = update fold_status [i] <- true in
+						   let _ = update bet_changed [i] <- true in
+						   ()
+						 else
+						   let _ = update bet_changed [i] <- true in
+						   ())
+						 ]
+				 in
+				 let next_i = i + 1 in
+				 g next_i
+		in
+		plloop 0
+in
+
+let show =
+  fix fi : (i : nat) -> (accum : nat) -> unit . (i : nat) . \(accum : nat) .
+    if i = n then
+      ()
+    else
+      let fj = fix fj : (j : nat) -> (accum : nat) -> unit . (j : nat) . \(accum : nat) .
+	         if j = num_players then
+		   let next_i = i + 1 in
+		   (fi next_i) accum
+		 else
+		   let tgt = select players_array [j] in
+		   let c = reveal accum in
+		   
+		   let _ =
+		       wapp players [c; wire players:(\(x:nat) .
+				     let _ = sysop send term tgt in
+				     let _ = sysop send term x in
+				     ()
+                       )]
+                   in
+		   let next_j = j + 1 in
+		   let next_accum = accum + 1 in
+		   (fj next_j) next_accum
+      in
+      (fj 0) accum
+in
+
+let _ = deal_initial_cards 0 in
+let _ = bet_rounds () in
+let _ = sysop send term "startcheck" in
+let _ = (show 0) 0 in
+let _ = sysop send term "endcheck" in
+
+let _ = sysop recv nat term in
+()

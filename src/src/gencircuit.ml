@@ -11,7 +11,7 @@ type envw = (string * wrange) list
 type envt = (string * typ) list
 
 (* TODO: this will go away once par mode closes types also *)
-let refenv = ref Ast.Env.empty
+(*let refenv = ref Ast.Env.empty*)
 
 let gmwsock = ref Unix.stdin
 let gmwsockset = ref false
@@ -86,7 +86,8 @@ let gatherperformance =
 	} !l);
   }
 
-let is_closedprincs_env vnd  =
+(*let is_closedprincs_env vnd  =
+  print_string "closing vnd: "; pp_value_nd vnd; print_newline ();
   let closevnd = AstMap.close_value !refenv vnd in    
   let rec helper = function
     | V_princ(pnd) -> [pnd]
@@ -94,7 +95,16 @@ let is_closedprincs_env vnd  =
     | V_ps_lit(l) -> List.flatten (List.map (fun v -> helper v.data) l)
     | _ -> pp_value_nd vnd; print_newline (); raise (CGenError "Princs not closed")
   in
-  helper closevnd.data
+  helper closevnd.data*)
+
+let princstolist vnd  =
+  let rec helper = function
+    | V_princ(pnd) -> [pnd]
+    | V_ps_union(v1, v2) -> helper v1.data @ helper v2.data
+    | V_ps_lit(l) -> List.flatten (List.map (fun v -> helper v.data) l)
+    | _ -> pp_value_nd vnd; print_newline (); raise (CGenError "Princs not closed")
+  in
+  helper vnd.data
 
 let rec size_env t =
   match t with
@@ -104,7 +114,8 @@ let rec size_env t =
   | T_sum([_, [t1]; _, [t2]]) -> max (size_env t1.data) (size_env t2.data) + 1
   | T_row(l) -> List.fold_left (fun s elt -> (size_env (snd elt).data) + s) 0 l
   | T_wire(vnd, tnd) ->
-    let cvnd = AstMap.close_value !refenv vnd in
+    (*let cvnd = AstMap.close_value !refenv vnd in*)
+    let cvnd = vnd in
     (List.length (is_closedprincs cvnd)) * (size_env tnd.data)
   | T_sh(_, tnd) -> size_env tnd.data
   | T_ps(_) -> natsize
@@ -127,7 +138,7 @@ let setupinp (princs:string list) (env:(string * typ) list) :(circuit * (string 
    *)
   let getprincinp (map:(string * typ) list StringMap.t) (varname, vartyp) = match vartyp with
     | T_wire(vnds, typnd) ->
-      let vprincsnds = is_closedprincs_env vnds in
+      let vprincsnds = princstolist vnds in
 
       let g mapprinc princnd =
 	let prev =
@@ -235,7 +246,7 @@ let setupinp (princs:string list) (env:(string * typ) list) :(circuit * (string 
    *)
   let f (ckt, wenv) (varname, vartyp) = match vartyp with
     | T_wire(vnds, typnd) ->
-      let vprincsnds = sortprincs (is_closedprincs_env vnds) in
+      let vprincsnds = sortprincs (princstolist vnds) in
       let sz = size_env typnd.data in
 
       if sz > 0 then
@@ -282,7 +293,7 @@ let rec setupout (princs:string list) (r:wrange) (t:typ) env =
     | T_sum([_, [t1]; _, [t2]]) -> max (outsize t1.data princ) (outsize t2.data princ) + 1
     | T_row(l) -> List.fold_left (fun s elt -> (outsize (snd elt).data princ) + s) 0 l
     | T_wire(vnd, tnd) ->
-      let cvnd = is_closedprincs_env vnd  in
+      let cvnd = princstolist vnd  in
       if existsprinc cvnd princ then
 	outsize tnd.data princ
       else
@@ -412,7 +423,7 @@ let rec setupout (princs:string list) (r:wrange) (t:typ) env =
 	(ckt', i + sz, wmap')*)
 	  
       | T_wire(vnd, typnd) ->
-	let sortedl = sortprincs (is_closedprincs_env vnd) in
+	let sortedl = sortprincs (princstolist vnd) in
 
 	List.fold_left (fun (c, i', w) princnd ->
 	  copyotherwires [princnd.data] typnd.data i' w c
@@ -510,6 +521,9 @@ let rec genv (env:(string * wrange) list) (vnd:value_nd) :(circuit * wrange) =
  * return circuit, wrange
  *)
 let rec genex (env:(string * wrange) list) (exnd:expr_nd) :(circuit * wrange) =
+  (*print_string "gen ckt for: ";
+  pp_expr_nd exnd;
+  print_newline ();*)
   match exnd.data with
     | E_value(vnd) -> genv env vnd
 
@@ -617,7 +631,7 @@ let rec genex (env:(string * wrange) list) (exnd:expr_nd) :(circuit * wrange) =
 	| E_value(v1), E_value(v2) -> v1, v2
 	| _ -> raise (CGenError "Non ANF form in E_wire in genex")
       in
-      let pndl = is_closedprincs_env vprincsnd in
+      let pndl = princstolist vprincsnd in
       
       let (ckt1, r1) = genv env vnd in
       
@@ -655,7 +669,7 @@ let rec genex (env:(string * wrange) list) (exnd:expr_nd) :(circuit * wrange) =
       let sz = size_env typnd.data in
       
       if sz > 0 then
-	let offset = getprincoffset (sortprincs (is_closedprincs_env vprincsnd)) pnd.data in
+	let offset = getprincoffset (sortprincs (princstolist vprincsnd)) pnd.data in
 	
 	let i1 = i + (offset - 1) * sz in
 	let j1 = i1 + sz - 1 in
@@ -682,9 +696,9 @@ let rec genex (env:(string * wrange) list) (exnd:expr_nd) :(circuit * wrange) =
       let sz = size_env typnd.data in
       
       if sz > 0 then	
-	let sortedpndl1 = sortprincs (is_closedprincs_env vprincsnd1) in
-	let sortedpndl2 = sortprincs (is_closedprincs_env vprincsnd2) in
-	let sortedpndl3 = sortprincs (is_closedprincs_env vprincsnd3) in
+	let sortedpndl1 = sortprincs (princstolist vprincsnd1) in
+	let sortedpndl2 = sortprincs (princstolist vprincsnd2) in
+	let sortedpndl3 = sortprincs (princstolist vprincsnd3) in
 
 	let (i3, j3) = walloc.getn (sz * List.length sortedpndl3) in
 
@@ -966,7 +980,7 @@ let rec parseoutput (arr:string array) (sharr:char array) (princ:string) (t:typ)
       tastnd (V_row(fvl)) t, arr', sharr'
 	
     | T_wire(vprincsnd, typnd) ->
-      if existsprinc (is_closedprincs_env vprincsnd) princ then
+      if existsprinc (princstolist vprincsnd) princ then
 	let (vnd, a, s) = parseoutput arr sharr princ typnd.data in
 	tastnd (V_wires[astnd princ, vnd]) t, a, s
       else
@@ -1074,9 +1088,12 @@ let runsecblk (princ:string) (princs:string list) (renv:env) (tenv:(string * typ
 
   (*print_string "Running secure block:"; print_newline ();
   pp_expr_nd e;
+  print_newline ();
+  print_string "with type: ";
+  pp_typ e.info;
   print_newline ();*)
 
-  refenv := renv;
+  (*refenv := renv;*)
   walloc.reset ();
   
   let sortedprincs = List.sort (fun s1 s2 -> compare s1 s2) princs in
@@ -1108,7 +1125,7 @@ let runsecblk (princ:string) (princs:string list) (renv:env) (tenv:(string * typ
       
     match t with
       | T_wire(vprincsnd, typnd) ->
-	if existsprinc (is_closedprincs_env vprincsnd) princ then
+	if existsprinc (princstolist vprincsnd) princ then
 	  let vnd = (Env.find (Var(varname)) renv).value in
 	  let _ = match vnd.data with
 	    (*| V_wires([_, vnd1]) ->
@@ -1168,8 +1185,8 @@ let runsecblk (princ:string) (princs:string list) (renv:env) (tenv:(string * typ
 
   let numgates = walloc.currid () + 1 in
   
-  (*print_string "dumping circuit: "; print_newline (); flush stdout;*)
-  (*Cktlib.printckt aggckt; print_newline ();*)
+  (*print_string "dumping circuit: "; print_newline (); flush stdout;
+  Cktlib.printckt aggckt; print_newline ();*)
   let _ = Gmwimpl.dumpgmwckt map bckt numgates fout in
   (*print_string "dumped circuit"; print_newline (); flush stdout;*)
 

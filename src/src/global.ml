@@ -12,7 +12,7 @@ type func =
 (* let func = ref F_test_circuit_gen *)
 let func = ref F_test_opsem
 
-let verbose_errors = ref false
+(* let verbose_errors = ref false *)
 let print_passes = ref true
 let debug_opsem = ref false
 let debug_store = ref false
@@ -28,19 +28,49 @@ let nat_to_princ:(intToStringMap ref) = ref (IntMap.empty)
 let p_to_n s = StringMap.find s (!princ_to_nat)
 let n_to_p n = IntMap.find n (!nat_to_princ)
 
-let args = [ 
-  ("--verbose",           Arg.Set verbose_errors, "give verbose (contextual) errors") ;
-  ("--db-opsem",          Arg.Set debug_opsem, "give verbose information during operational semantics") ;
-  ("--db-store",          Arg.Set debug_store, "when --db-opsem is set, also debugs the store too") ;
-  ("--gmw-port",          Arg.Int (fun port -> gmwport := port), "set the GMW server port");
-  ("--gmw-addr",          Arg.String (fun addr -> gmwaddr := addr), "set the GMW server IP address");
-  ("--princs-encoding",   Arg.String (fun file -> p_enc_file := file), "file from which princs to nat encoding should be read");
-  ("--pp-ast",            Arg.Unit (fun _ -> func := F_pretty_print_ast ), "pretty-print the ast then quit." ) ;
-  ("--db-ckt",            Arg.Unit (fun _ -> func := F_test_circuit_gen ), "test/debug circuit generation." ) ;
-  ("--test-opsem",        Arg.Unit (fun _ -> func := F_test_opsem), "test/debug small-step operational semantics." ) ;
-  ("--i-am",              Arg.String (fun me -> whoami := me), "set local principal name (e.g., !Alice)") ;
-  ("--my-secrets",        Arg.String (fun s -> secrets := s), "set local secrets (e.g., {x:3, y:7})") ;
+let args = Arg.align [ 
+(*  ("--verbose",           Arg.Set verbose_errors, " give verbose (contextual) errors") ; *)
+  ("--db-opsem",          Arg.Set debug_opsem, " give verbose information during operational semantics") ;
+  ("--db-store",          Arg.Set debug_store, " when --db-opsem is set, also debugs the store too") ;
+  ("--gmw-port",          Arg.Int (fun port -> gmwport := port), " set the GMW server port");
+  ("--gmw-addr",          Arg.String (fun addr -> gmwaddr := addr), " set the GMW server IP address");
+  ("--princs-encoding",   Arg.String (fun file -> p_enc_file := file), " file from which princs to nat encoding should be read");
+  ("--pp-ast",            Arg.Unit (fun _ -> func := F_pretty_print_ast ), " pretty-print the ast then quit." ) ;
+  ("--db-ckt",            Arg.Unit (fun _ -> func := F_test_circuit_gen ), " test/debug circuit generation." ) ;
+  ("--test-opsem",        Arg.Unit (fun _ -> func := F_test_opsem), " test/debug small-step operational semantics." ) ;
+  ("--i-am",              Arg.String (fun me -> whoami := me), " set local principal name (e.g., !Alice)") ;
+  ("--my-secrets",        Arg.String (fun s -> secrets := s), " set local secrets (e.g., {x:3, y:7})") ;
 ]
+
+let parse_princ_nat_mapping _ =
+  let _ = 
+    try
+      let fin = open_in !p_enc_file in
+      let rec helper (x:unit) :unit =
+	try
+	  let s = input_line fin in
+	  let l = Str.split (Str.regexp "[ ]+") s in
+	  let p, n = match l with
+	    | p1::n1::[] -> p1, n1
+	    | _ ->
+	      print_string "Line "; print_string s; print_string " in princ map file not in <princ_name>[ ]+<princ_id> format";
+	      raise (Invalid_argument "")
+	  in
+	  
+	  princ_to_nat := StringMap.add p (int_of_string n) (!princ_to_nat);
+	  nat_to_princ := IntMap.add (int_of_string n) p (!nat_to_princ);
+	  helper ()
+	with
+	  | End_of_file -> close_in fin
+      in
+      helper ()
+    with
+      | Sys_error(_) ->
+	print_string "Warning: princs to nat map file not found";
+	print_newline ()	
+  in
+  ()
+
 
 let cur_filename = ref ""
 
