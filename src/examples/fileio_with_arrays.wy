@@ -1,0 +1,47 @@
+let size = 10 in
+let last = size - 1 in
+
+let a = array [size] of {#i:0, #message:""} in
+let _ = 
+  for i = 0 to last do
+    update a[i] <- {#i:i, #message:"apple"}
+  done
+in
+
+(* Write array 'a' to the filesystem. *)
+let _ = 
+  let writer = sysop run "cat > sillytemp1" in
+  let _ =
+    for i = 0 to last do
+      let msg = select a[i] in
+      sysop send writer msg
+    done
+  in
+  let _ = sysop stop writer in
+  ()
+in
+
+(* Read array 'a' from the filesystem, storing into array 'b'. *)
+let b = array [10] of {#i:0, #message:""} in
+let _ = 
+  let reader = sysop run "cat < sillytemp1" in
+  for i = 0 to last do
+    let msg = sysop recv {#i:nat,#message:string} reader in
+    update b[i] <- msg
+  done
+in
+
+(* Write array 'b' to the filesystem. *)
+let _ = 
+  let writer = sysop run "cat > sillytemp2" in
+  let _ =
+    for i = 0 to last do
+      let msg = select b[i] in
+      sysop send writer msg
+    done
+  in
+  let _ = sysop stop writer in
+  ()
+in
+
+()

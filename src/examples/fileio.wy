@@ -1,0 +1,43 @@
+(* 'sysop run' runs a shell command, returning it as a new process. *)
+let writer = sysop run "cat > sillytemp" in
+(* Concretely: The writer process above writes its input to the file
+   'sillytemp'.  It produces no other output. *)
+
+(* 'sysop send' sends a process zero or more values. The values are
+   pretty-printed to the processes' standard input. Multiple values are
+   separated by spaces. The text is terminated with a new line
+   character. *)
+let _ = sysop send writer "apple" in
+let _ = sysop send writer 1 in
+let _ = sysop send writer "orange" in
+let _ = sysop send writer { #f1 : "APPLE!", #f2 : 1, #f3 : "ORANGE!"} in
+(* Concretely: Once the lines above are fully processed, the file
+   sillytemp will contain four lines, each with a sent value.
+
+   However, due to asynchrony, we proceed without waiting for the
+   writer process to fully write its output to disk. *)
+
+(* 'sysop stop' waits until the process terminates. *)
+let _ = sysop stop writer in
+(* Concretely: Now the file 'sillytemp' is completely written. *)
+
+let reader = sysop run "cat < sillytemp" in
+(* Concretely: As above, we start an external process.  This time, it
+   reads from sillytemp. *)
+
+(* 'sysop recv' receives a value from a process. The value is read
+   (in Wysteria concrete syntax) from the the processes' standard
+   output. The operation assumes that each read value occupies its own
+   line. Other whitespace is ignored.
+*)
+let y1 = sysop recv string reader in
+let y2 = sysop recv nat    reader in
+let y3 = sysop recv string reader in
+let y4 = sysop recv string reader in
+
+(* Concretely: Now the variables y1, y2, y3 and y4 refer to the sent
+               values above. *)
+{#y1:y1,
+ #y2:y2,
+ #y3:y3,
+ #y4:y4}
