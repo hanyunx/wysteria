@@ -680,6 +680,14 @@ module Make (Flags:OPSEM_FLAGS) = struct
 	    | _ -> raise (Stuck cfg)
 	  end
 
+	| "strsub" ->
+	  begin match typ_op, vals with
+	    | None, [{data=V_string(s)}; {data=V_nat(i)}; {data=V_nat(j)}] ->
+	      let delim = String.make 1 '"' in
+	      parse_value ("sysop strcat") (delim ^ (String.sub s i j) ^ delim)
+	    | _ -> raise (Stuck cfg)
+	  end
+
         | _ ->
 	    raise (Stuck cfg)
     in
