@@ -1,0 +1,148 @@
+
+(* 
+   Warrior=0 | Mage=1 | Swordsman=2
+
+   kind -- public
+   hp   -- public
+   atk  -- secret
+   def  -- secret
+   mag  -- secret
+   res  -- secret
+   morale -- secret
+   move_dis -- public
+   controller -- public
+*)
+
+let make_soldier =
+  \(x:ps{singl}).
+  \(y:ps{singl}).
+  \(stats: {#kind:nat,
+            #hp:W x nat,
+            #atk:W x nat,
+            #def:W x nat,
+            #mag:W x nat,
+            #res:W x nat,
+            #morale:W x nat}).
+ let tmp @ par({x,y}) = 
+  let soldier @ sec({x,y}) =
+    let kind = stats.#kind in
+    let hp = makesh ((stats.#hp)[x]) in
+    let atk = makesh ((stats.#atk)[x]) in
+    let def = makesh ((stats.#def)[x]) in
+    let mag = makesh ((stats.#mag)[x]) in
+    let res = makesh ((stats.#res)[x]) in
+    let morale = makesh ((stats.#morale)[x]) in
+    {#kind:kind,
+     #hp:hp,
+     #atk:atk,
+     #def:def,
+     #mag:mag,
+     #res:res,
+     #morale:morale }
+  in
+  soldier
+ in
+ 0 (* TODO: want to return tmp.  But cannot do so. *)
+   (* The issue is that tmp is typed at par{!Alice,!Bob}, 
+      but the outer context is typed under top. 
+      Need to tell wysteria that top = {!Alice,!Bob}. *)
+   (* TODO: Ask Aseem about how to get around this. *)
+in
+
+
+let tmp @ par({!Alice,!Bob}) = 
+
+let sh_0 @ sec({!Alice,!Bob} ) = makesh 0 in
+let sh_10 @ sec({!Alice,!Bob} ) = makesh 10 in
+let sh_35 @ sec({!Alice,!Bob} ) = makesh 35 in
+
+
+let soldier_x @ par({!Alice,!Bob}) = {
+   #kind       : 0,
+   #hp         : sh_10,
+   #atk        : sh_35,
+   #def        : sh_35,
+   #mag        : sh_35,
+   #res        : sh_35,
+   #morale     : sh_35,
+   #move_dis   : 5,
+   #controller : !Alice
+} in
+
+let soldier_y   @ par({!Alice,!Bob})   = {
+   #kind       : 0,
+   #hp         : sh_10,
+   #atk        : sh_35,
+   #def        : sh_35,
+   #mag        : sh_35,
+   #res        : sh_35,
+   #morale     : sh_35,
+   #move_dis   : 5,
+   #controller : !Bob
+} in
+
+
+let dummy_soldier @ par({!Alice,!Bob}) = {
+   #kind       : 0,
+   #hp         : sh_0,
+   #atk        : sh_0,
+   #def        : sh_0,
+   #mag        : sh_0,
+   #res        : sh_0,
+   #morale     : sh_0,
+   #move_dis   : 5,
+   #controller : !Fart_face
+} in
+
+let soldiers @ par({!Alice,!Bob}) = 
+  array [ 18 ] of dummy_soldier
+in
+
+let calc_damage = 
+
+  \(atk: {#kind:nat,
+          #hp:Sh {!Alice,!Bob} nat,
+          #atk:Sh {!Alice,!Bob} nat,
+          #def:Sh {!Alice,!Bob} nat,
+          #mag:Sh {!Alice,!Bob} nat,
+          #res:Sh {!Alice,!Bob} nat,
+          #morale:Sh {!Alice,!Bob} nat} ). 
+
+  \(vic: {#kind:nat,
+          #hp:Sh {!Alice,!Bob} nat,
+          #atk:Sh {!Alice,!Bob} nat,
+          #def:Sh {!Alice,!Bob} nat,
+          #mag:Sh {!Alice,!Bob} nat,
+          #res:Sh {!Alice,!Bob} nat,
+          #morale:Sh {!Alice,!Bob} nat} ). 
+
+   let damage @ sec({!Alice,!Bob}) =
+     let atk_morale = combsh (atk.#morale) in
+     let vic_morale = combsh (vic.#morale) in
+     let dif_morale = atk_morale - vic_morale in
+     let atk_mag = combsh (atk.#mag) in
+     let vic_res = combsh (vic.#res) in
+     let atk_atk = combsh (atk.#atk) in
+     let vic_def = combsh (vic.#def) in
+     if atk.#kind = 0 then
+       dif_morale + (atk_mag - vic_res)
+     else
+       dif_morale + (atk_atk - vic_def)
+   in
+   wire {!Alice,!Bob}:damage
+in  
+
+
+0
+
+in
+wire {!Alice,!Bob}:tmp
+
+(*      
+
+let bob_x   @ par(!Bob)   =
+
+let alice_y @ par(!Alice) =
+let bob_y   @ par(!Bob)   =
+
+*)
