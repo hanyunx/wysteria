@@ -13,7 +13,7 @@ then
     OBJS="unix.cma str.cma global.cmo sysproc.cmo ast.cmo $LEXER.cmo $PARSER.cmo testtyp.cmo refchk.cmo typchk.cmo cktlib.cmo gmwimpl.cmo gencircuit.cmo opsem.cmo driver.cmo"
 else
     OCAMLC=ocamlopt
-    OBJS="unix.cmxa str.cmxa global.cmx sysproc.cmx ast.cmx $LEXER.cmx $PARSER.cmx testtyp.cmx refchk.cmx typchk.cmx cktlib.cmx gmwimpl.cmx gencircuit.cmx opsem.cmx driver.cmx main.cmx"
+    OBJS="unix.cmxa str.cmxa global.cmx sysproc.cmx ast.cmx $LEXER.cmx $PARSER.cmx parsehelp.cmx testtyp.cmx refchk.cmx typchk.cmx cktlib.cmx gmwimpl.cmx gencircuit.cmx opsem.cmx driver.cmx main.cmx"
 fi
 
 CPP=/usr/bin/g++
@@ -39,6 +39,7 @@ function build()
 	$OCAMLC $FLAGS -c $SRC/$PARSER.mli && \
 	$OCAMLC $FLAGS -c $SRC/$LEXER.ml && \
 	$OCAMLC $FLAGS -c $SRC/$PARSER.ml && \
+	$OCAMLC $FLAGS -c $SRC/parsehelp.ml && \
 	$OCAMLC $FLAGS -c $SRC/testtyp.ml && \
 	$OCAMLC $FLAGS -c $SRC/refchk.ml && \
 	$OCAMLC $FLAGS -c $SRC/typchk.ml && \

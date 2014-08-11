@@ -17,6 +17,7 @@ let print_passes = ref true
 let debug_opsem = ref false
 let debug_store = ref false
 let whoami = ref "No_one"
+let whoarewe = ref "top"
 let secrets = ref "{}"
 let gmwport = ref 0
 let gmwaddr = ref "127.0.0.1"
@@ -39,6 +40,7 @@ let args = Arg.align [
   ("--db-ckt",            Arg.Unit (fun _ -> func := F_test_circuit_gen ), " test/debug circuit generation." ) ;
   ("--test-opsem",        Arg.Unit (fun _ -> func := F_test_opsem), " test/debug small-step operational semantics." ) ;
   ("--i-am",              Arg.String (fun me -> whoami := me), " set local principal name (e.g., !Alice)") ;
+  ("--we-are",            Arg.String (fun us -> Printf.printf "\n%s\n%!" us; whoarewe := us), " set global principal set (e.g., {!Alice,!Bob})");
   ("--my-secrets",        Arg.String (fun s -> secrets := s), " set local secrets (e.g., {x:3, y:7})") ;
 ]
 

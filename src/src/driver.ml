@@ -24,11 +24,18 @@ let eval ast =
       | F_body e ->
 	let astnd p d = { prov = p; data = d; info = T_unknown } in
 	let modend = astnd Global.dprov Par in
+
+(*
 	let topplcnd = astnd Global.dprov Pl_top in
 	let plabc = astnd Global.dprov (Pl_ps(modend, ablitvnd)) in
 	print_string "typing the place"; print_newline ();
 	(*let tplabc = Typchk.typplcnd plabc topplcnd [] in*)
 	let tplabc = topplcnd in
+*)
+        let place = Parsehelp.parse_place "" (!Global.whoarewe) in
+        let place = Typchk.typplcnd place (astnd Global.dprov Pl_top) [] in
+        let tplabc = place in
+        
 	print_string "typing the program under "; Pretty.pp_place_nd tplabc; print_newline ();
 	let typde, eff, nenv = Typchk.typex e tplabc !tenvref in
 	tenvref := nenv;

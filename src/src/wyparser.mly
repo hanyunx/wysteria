@@ -65,6 +65,7 @@ let astnd thing start_pos end_pos =
 %start file
 %start env
 %start value
+%start place
 
 %type <Ast.var_nd> var
 %type <Ast.cons_nd> cons
