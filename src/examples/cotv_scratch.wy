@@ -1,3 +1,4 @@
+let all = {!Alice,!Bob} in
 
 (* 
    Warrior=0 | Mage=1 | Swordsman=2
@@ -14,7 +15,7 @@
 *)
 
 let make_soldier =
-  \(xy:ps{= {!Alice,!Bob}}).
+  \(xy:ps{=all}). (* TODO: Ideally, this would also work when 'xy subeq all', too *)
   \(x:ps{singl and subeq xy }).
   \(y:ps{singl and subeq xy }).
   \(stats: {#kind:nat,
@@ -47,14 +48,14 @@ let make_soldier =
 in
 
 
-let tmp @ par({!Alice,!Bob}) = 
+let tmp @ par(all) = 
 
-let sh_0 @ sec({!Alice,!Bob} ) = makesh 0 in
-let sh_10 @ sec({!Alice,!Bob} ) = makesh 10 in
-let sh_35 @ sec({!Alice,!Bob} ) = makesh 35 in
+let sh_0 @ sec(all) = makesh 0 in
+let sh_10 @ sec(all) = makesh 10 in
+let sh_35 @ sec(all) = makesh 35 in
 
 
-let soldier_x @ par({!Alice,!Bob}) = {
+let soldier_x @ par(all) = {
    #kind       : 0,
    #hp         : sh_10,
    #atk        : sh_35,
@@ -66,7 +67,7 @@ let soldier_x @ par({!Alice,!Bob}) = {
    #controller : !Alice
 } in
 
-let soldier_y   @ par({!Alice,!Bob})   = {
+let soldier_y   @ par(all)   = {
    #kind       : 0,
    #hp         : sh_10,
    #atk        : sh_35,
@@ -79,7 +80,7 @@ let soldier_y   @ par({!Alice,!Bob})   = {
 } in
 
 
-let dummy_soldier @ par({!Alice,!Bob}) = {
+let dummy_soldier @ par(all) = {
    #kind       : 0,
    #hp         : sh_0,
    #atk        : sh_0,
@@ -91,29 +92,29 @@ let dummy_soldier @ par({!Alice,!Bob}) = {
    #controller : !Fart_face
 } in
 
-let soldiers @ par({!Alice,!Bob}) = 
+let soldiers @ par(all) = 
   array [ 18 ] of dummy_soldier
 in
 
 let calc_damage = 
 
   \(atk: {#kind:nat,
-          #hp:Sh {!Alice,!Bob} nat,
-          #atk:Sh {!Alice,!Bob} nat,
-          #def:Sh {!Alice,!Bob} nat,
-          #mag:Sh {!Alice,!Bob} nat,
-          #res:Sh {!Alice,!Bob} nat,
-          #morale:Sh {!Alice,!Bob} nat} ). 
+          #hp:Sh all nat,
+          #atk:Sh all nat,
+          #def:Sh all nat,
+          #mag:Sh all nat,
+          #res:Sh all nat,
+          #morale:Sh all nat} ). 
 
   \(vic: {#kind:nat,
-          #hp:Sh {!Alice,!Bob} nat,
-          #atk:Sh {!Alice,!Bob} nat,
-          #def:Sh {!Alice,!Bob} nat,
-          #mag:Sh {!Alice,!Bob} nat,
-          #res:Sh {!Alice,!Bob} nat,
-          #morale:Sh {!Alice,!Bob} nat} ). 
+          #hp:Sh all nat,
+          #atk:Sh all nat,
+          #def:Sh all nat,
+          #mag:Sh all nat,
+          #res:Sh all nat,
+          #morale:Sh all nat} ). 
 
-   let damage @ sec({!Alice,!Bob}) =
+   let damage @ sec(all) =
      let atk_morale = combsh (atk.#morale) in
      let vic_morale = combsh (vic.#morale) in
      let dif_morale = atk_morale - vic_morale in
@@ -126,14 +127,14 @@ let calc_damage =
      else
        dif_morale + (atk_atk - vic_def)
    in
-   wire {!Alice,!Bob}:damage
+   wire all:damage
 in  
 
 
 0
 
 in
-wire {!Alice,!Bob}:tmp
+wire all:tmp
 
 (*      
 
