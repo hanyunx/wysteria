@@ -1,0 +1,21 @@
+(* 
+   Ran as:
+
+   ./bin/wysteria examples/delegation_test.wy --i-am \!Alice --we-are 'par({!Alice,!Bob})' 
+*)
+
+let make_secure_share =
+  \(xy:ps{ = {!Alice,!Bob}}).
+  \(x:ps{singl and subeq xy }).
+  \(y:ps{singl and subeq xy }).
+  \(w:W x nat).
+ let tmp1 @ par(xy) = 
+   let tmp2 @ sec(xy) = 
+      let a = w[x] in
+      makesh a
+   in
+   tmp2
+ in
+ tmp1
+in
+0

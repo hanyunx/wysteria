@@ -1,0 +1,49 @@
+let make_secure_share =
+  \(x:ps{singl and subeq {!Alice,!Bob} }).
+  \(y:ps{singl and subeq {!Alice,!Bob} }).
+  \(w:W x nat).
+ let tmp1 @ par({x,y}) = 
+   let tmp2 @ sec({x,y}) = 
+      let a = w[x] in
+      makesh a
+   in
+   tmp2
+ in
+ tmp1
+in
+0
+
+(* 
+   Ran as:
+
+   ./bin/wysteria examples/delegation_test.wy --i-am \!Alice --we-are 'par({!Alice,!Bob})' 
+
+   Got the error below.
+   See delegation_workaround.wy for a version that works around this problem.
+*)
+
+(*
+typing the program under par({!Alice,!Bob})
+File "examples/delegation_test.wy", line 13, characters 14-15: Variable w is bound at place par({!Alice,!Bob}) and cannot be used at current place sec({x,y})
+Fatal error: exception Typchk.TypError("")
+Raised at file "src//typchk.ml", line 25, characters 8-21
+Called from file "src//typchk.ml", line 597, characters 17-33
+Called from file "src//typchk.ml", line 757, characters 25-41
+Called from file "src//typchk.ml", line 681, characters 20-37
+Called from file "src//typchk.ml", line 681, characters 20-37
+Called from file "src//typchk.ml", line 681, characters 20-37
+Called from file "src//typchk.ml", line 1350, characters 27-72
+Called from file "src//typchk.ml", line 1405, characters 27-47
+Called from file "src//typchk.ml", line 853, characters 27-47
+Called from file "src//typchk.ml", line 1350, characters 27-72
+Called from file "src//typchk.ml", line 1405, characters 27-47
+Called from file "src//typchk.ml", line 853, characters 27-47
+Called from file "src//typchk.ml", line 1350, characters 27-72
+Called from file "src//typchk.ml", line 1405, characters 27-47
+Called from file "src//typchk.ml", line 853, characters 27-47
+Called from file "src//typchk.ml", line 681, characters 20-37
+Called from file "src//driver.ml", line 40, characters 24-54
+Called from file "src//main.ml", line 77, characters 29-44
+Called from file "list.ml", line 55, characters 20-23
+Called from file "src//main.ml", line 99, characters 10-57
+*)
