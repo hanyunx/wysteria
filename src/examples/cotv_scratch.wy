@@ -14,8 +14,9 @@
 *)
 
 let make_soldier =
-  \(x:ps{singl and subeq {!Alice,!Bob} }).
-  \(y:ps{singl and subeq {!Alice,!Bob} }).
+  \(xy:ps{= {!Alice,!Bob}}).
+  \(x:ps{singl and subeq xy }).
+  \(y:ps{singl and subeq xy }).
   \(stats: {#kind:nat,
             #hp:W x nat,
             #atk:W x nat,
@@ -23,8 +24,8 @@ let make_soldier =
             #mag:W x nat,
             #res:W x nat,
             #morale:W x nat}).
- let tmp @ par({x,y}) = 
-  let soldier @ sec({x,y}) =
+ let tmp @ par(xy) = 
+  let soldier @ sec(xy) =
     let kind = stats.#kind in
     let hp = makesh ((stats.#hp)[x]) in
     let atk = makesh ((stats.#atk)[x]) in
@@ -42,11 +43,7 @@ let make_soldier =
   in
   soldier
  in
- tmp (* TODO: want to return tmp.  But cannot do so. *)
-   (* The issue is that tmp is typed at par{!Alice,!Bob}, 
-      but the outer context is typed under top. 
-      Need to tell wysteria that top = {!Alice,!Bob}. *)
-   (* TODO: Ask Aseem about how to get around this. *)
+ tmp
 in
 
 
