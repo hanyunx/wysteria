@@ -71,6 +71,7 @@ rule token = parse
   | ("⊆" | "subeq") { SUBEQ }
   | "()" { UNITV }
   | "and" { AND }
+  | "not" { NOT }
   | "top" { TOP }
   | ( "{}" | "∅" ) { EMP } 
   | "singl" { SINGL }

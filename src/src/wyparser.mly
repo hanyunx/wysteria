@@ -37,7 +37,7 @@ let astnd thing start_pos end_pos =
 /* -- TODO */
 %token TUNIT TWIRE UNITV EMP UNION TNAT TBOOL TSTRING TPROC
 %token TRUE FALSE
-%token SUBEQ AND TOP
+%token SUBEQ AND TOP NOT
 %token PAR SEC
 %token SINGL PS FIX LAM MATCH WITH BEGIN END MEND LET 
 %token IN AT WIRE PLUSPLUS PLUS GT WAPP WAPS WFOLD BIGARR WCOPY FROM AS CAST
@@ -156,7 +156,8 @@ mode:
 ;
 
 refine:
-| refine_ AND refine_ { astnd( Ast.R_conj( $1, $3 )) 1 3 }
+| refine_ AND refine  { astnd( Ast.R_conj( $1, $3 )) 1 3 }
+| NOT refine_         { astnd( Ast.R_not( $2 )) 1 2 }
 | refine_             { $1 }
 ;
 refine_:

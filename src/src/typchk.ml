@@ -308,8 +308,8 @@ let rec del (p:place_nd) (q:place_nd) (env:tenv) :bool =
   match p.data, q.data with
     | Pl_top, _ -> true
 
-    | Pl_ps({data = Par}, pvnd), Pl_ps({data = Sec}, qvnd) -> veqprincs (getref pvnd) qvnd env
-    
+    (*| Pl_ps({data = Par}, pvnd), Pl_ps({data = Sec}, qvnd) -> veqprincs (getref pvnd) qvnd env*)
+    | Pl_ps({data = Par}, _), Pl_ps({data = Sec}, qvnd)
     | Pl_ps({data = Par}, _), Pl_ps({data = Par}, qvnd) -> issubsetplc (getref qvnd) p env
 
     | _ -> false
