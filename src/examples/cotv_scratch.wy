@@ -1,8 +1,6 @@
 let all = {!Alice,!Bob} in
 
 (* 
-   Warrior=0 | Mage=1 | Swordsman=2
-
    kind -- public
    hp   -- public
    atk  -- secret
@@ -14,10 +12,21 @@ let all = {!Alice,!Bob} in
    controller -- public
 *)
 
+(* 
+ kind = [ Warrior=0 | Mage=1 | Swordsman=2 ]
+ type soldier =
+   {#kind:nat,
+    #hp:Sh all nat,
+    #atk:Sh all nat,
+    #def:Sh all nat,
+    #mag:Sh all nat,
+    #res:Sh all nat,
+    #morale:Sh all nat}
+*)
+
 let make_soldier =
-  \(xy:ps{=all}). (* TODO: Ideally, this would also work when 'xy subeq all', too *)
-  \(x:ps{singl and subeq xy }).
-  \(y:ps{singl and subeq xy }).
+  (* Creates a soldier from some private statistics known only to x. *)     
+  \(x:ps{singl and subeq all }). (* x is the sender of the soldier data. *)
   \(stats: {#kind:nat,
             #hp:W x nat,
             #atk:W x nat,
@@ -25,14 +34,13 @@ let make_soldier =
             #mag:W x nat,
             #res:W x nat,
             #morale:W x nat}).
- let tmp @ par(xy) = 
-  let soldier @ sec(xy) =
+  let soldier @ sec(all) =
     let kind = stats.#kind in
-    let hp = makesh ((stats.#hp)[x]) in
-    let atk = makesh ((stats.#atk)[x]) in
-    let def = makesh ((stats.#def)[x]) in
-    let mag = makesh ((stats.#mag)[x]) in
-    let res = makesh ((stats.#res)[x]) in
+    let hp   = makesh ((stats.#hp)[x]) in
+    let atk  = makesh ((stats.#atk)[x]) in
+    let def  = makesh ((stats.#def)[x]) in
+    let mag  = makesh ((stats.#mag)[x]) in
+    let res  = makesh ((stats.#res)[x]) in
     let morale = makesh ((stats.#morale)[x]) in
     {#kind:kind,
      #hp:hp,
@@ -43,17 +51,46 @@ let make_soldier =
      #morale:morale }
   in
   soldier
- in
- tmp
 in
 
+let calc_damage = 
+  (* given two soldiers, an attacker and a victim, 
+     calc_damage calculates the damage of the attacker on the victim. *)
+  \(atk: {#kind:nat,
+          #hp:Sh all nat,
+          #atk:Sh all nat,
+          #def:Sh all nat,
+          #mag:Sh all nat,
+          #res:Sh all nat,
+          #morale:Sh all nat} ). 
+  \(vic: {#kind:nat,
+          #hp:Sh all nat,
+          #atk:Sh all nat,
+          #def:Sh all nat,
+          #mag:Sh all nat,
+          #res:Sh all nat,
+          #morale:Sh all nat} ). 
+   let damage @ sec(all) =
+     let atk_morale = combsh (atk.#morale) in
+     let vic_morale = combsh (vic.#morale) in
+     let dif_morale = atk_morale - vic_morale in
+     let atk_mag = combsh (atk.#mag) in
+     let vic_res = combsh (vic.#res) in
+     let atk_atk = combsh (atk.#atk) in
+     let vic_def = combsh (vic.#def) in
+     if atk.#kind = 0 then
+       dif_morale + (atk_mag - vic_res)
+     else
+       dif_morale + (atk_atk - vic_def)
+   in
+   damage
+in  
 
-let tmp @ par(all) = 
+(* Creating some dummy soldiers: *)
 
 let sh_0 @ sec(all) = makesh 0 in
 let sh_10 @ sec(all) = makesh 10 in
 let sh_35 @ sec(all) = makesh 35 in
-
 
 let soldier_x @ par(all) = {
    #kind       : 0,
@@ -96,51 +133,4 @@ let soldiers @ par(all) =
   array [ 18 ] of dummy_soldier
 in
 
-let calc_damage = 
-
-  \(atk: {#kind:nat,
-          #hp:Sh all nat,
-          #atk:Sh all nat,
-          #def:Sh all nat,
-          #mag:Sh all nat,
-          #res:Sh all nat,
-          #morale:Sh all nat} ). 
-
-  \(vic: {#kind:nat,
-          #hp:Sh all nat,
-          #atk:Sh all nat,
-          #def:Sh all nat,
-          #mag:Sh all nat,
-          #res:Sh all nat,
-          #morale:Sh all nat} ). 
-
-   let damage @ sec(all) =
-     let atk_morale = combsh (atk.#morale) in
-     let vic_morale = combsh (vic.#morale) in
-     let dif_morale = atk_morale - vic_morale in
-     let atk_mag = combsh (atk.#mag) in
-     let vic_res = combsh (vic.#res) in
-     let atk_atk = combsh (atk.#atk) in
-     let vic_def = combsh (vic.#def) in
-     if atk.#kind = 0 then
-       dif_morale + (atk_mag - vic_res)
-     else
-       dif_morale + (atk_atk - vic_def)
-   in
-   wire all:damage
-in  
-
-
 0
-
-in
-wire all:tmp
-
-(*      
-
-let bob_x   @ par(!Bob)   =
-
-let alice_y @ par(!Alice) =
-let bob_y   @ par(!Bob)   =
-
-*)
