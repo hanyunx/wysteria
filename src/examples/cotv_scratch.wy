@@ -1,3 +1,9 @@
+(* Run this (as Alice) as follows:
+
+  ./bin/wysteria examples/cotv_scratch.wy --i-am \!Alice --we-are 'par({!Alice,!Bob})'
+
+*)
+
 let all = {!Alice,!Bob} in
 
 (* 
