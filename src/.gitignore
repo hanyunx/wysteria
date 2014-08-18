@@ -1,0 +1,11 @@
+z3
+gmw.exe
+bin/
+circuit*.txt
+in_*.txt
+shin*.txt
+out*.txt
+shout*.txt
+config*.txt
+z3*.smt
+

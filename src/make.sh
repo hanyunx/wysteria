@@ -27,7 +27,7 @@ FLAGS="-g -dtypes -I $SRC"
 
 export OCAMLRUNPARAM=b
 
-function build()
+build ()
 {
     echo "Building..." &&\
     mkdir -p $BIN &&\
@@ -61,7 +61,7 @@ function build()
     # echo "Median generators compiled.\n"
 }
 
-function mktop()
+mktop ()
 {
     $MKOCAMLTOP -o $BIN/wtop -I $SRC $OBJS && \
     echo "Wysteria top-level successfully built.\n"

@@ -1,0 +1,36 @@
+This is an install guide written by Arjun Narayan.
+
+To install Wysteria, you need the following dependencies installed:
+
+0. Note, if you are on OS X, you need to install z3 separately. I
+recommend downloading a precompiled z3, available from
+http://z3.codeplex.com/releases/view/101918.
+
+1. OCaml version 4.0 or higher. Note that OCaml 3.2 and lower will not
+work. You also need OCamlyacc, OCamllex, etc. These should be
+installed by default when you install OCaml, but that varies according
+to your distribution.
+
+The locations of your OCaml and associated binaries (such as OCamllex
+and OCamlyacc) should be in your path.
+
+2. z3. A version of z3 is provided with this distribution (4.3.1),
+under z3. To build z3, follow the instructions under z3/README. 
+
+z3 on OS X: Note that the provided z3 version does not compile on OS X
+(this is a known z3 bug. The z3 developers suggest using 4.3.2 or
+higher, where this is fixed). If you are on OS X, separately download
+and install z3. Before proceeding to step (4), you need to copy the z3
+binary from the compiled location to src/.
+
+3. The GMW Secure Multiparty Computation implementation. This is also
+provided with this distribution, under gmw/.
+
+To build GMW, run "make" under gmw/.
+
+Copy the file gmw/gmw.exe to the src/ directory (not the src/
+directory inside gmw/, copy it to wysteria/src/).
+
+4. With these dependencies installed, cd to the src/ directory, and
+run "make.sh". 
+
