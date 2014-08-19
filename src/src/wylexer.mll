@@ -37,7 +37,7 @@ let strlit = '"' ( [^'"'] | "\\\"" )* '"'
 let charlit = '\'' [^'\'']* '\''
 
 rule token = parse
-  | [' ' '\t'] { token lexbuf }
+  | [' ' '\t' '\r'] { token lexbuf }
   | eol        { incr_linenum lexbuf ; token lexbuf } 
   | '(' '*'    { nested_comment 0 lexbuf }
   | '.' { DOT }
