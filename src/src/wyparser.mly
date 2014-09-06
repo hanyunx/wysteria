@@ -3,18 +3,6 @@
 open Printf
 open Lexing
 
-let string_of_chars : char list -> string = 
-  fun chars ->
-    let len = List.length chars in
-    let str = String.create len in
-    let rec loop i = function
-      | char :: chars -> 
-          ( str.[i] <- char; 
-            loop (i+1) chars)
-      | [] -> str
-    in
-    ( loop 0 chars )
-
 (* Create an astnd for the currently-parsed node *)
 let astnd thing start_pos end_pos = 
   let start_pos = Parsing.rhs_start_pos start_pos in

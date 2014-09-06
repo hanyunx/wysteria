@@ -1,0 +1,22 @@
+let all = {!Alice, !Bob} in
+
+let w = wire all:100 in
+
+let o @ sec(all) =
+  let out = makesh w[!Alice] in
+  out
+in
+
+let m @ sec(all) =
+  let v   = combsh o in
+  let inc = v + 1 in
+  let out = makesh inc in  
+  out
+in
+
+let f @ sec(all) =
+  let out = combsh m in
+  out
+in
+
+f

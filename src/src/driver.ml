@@ -23,9 +23,9 @@ let eval ast =
     match ast.data with
       | F_body e ->
 	let astnd p d = { prov = p; data = d; info = T_unknown } in
-	let modend = astnd Global.dprov Par in
 
 (*
+  	let modend = astnd Global.dprov Par in
 	let topplcnd = astnd Global.dprov Pl_top in
 	let plabc = astnd Global.dprov (Pl_ps(modend, ablitvnd)) in
 	print_string "typing the place"; print_newline ();
@@ -54,10 +54,10 @@ let eval ast =
     else 
       driver_loop (S.step cfg)
   in
-  let time1 = Unix.gettimeofday () in
+  (*let time1 = Unix.gettimeofday () in*)
   Random.self_init ();
   let final_cfg = driver_loop cfg in
-  let time2 = Unix.gettimeofday () in
+  (*let time2 = Unix.gettimeofday () in*)
   (*print_string "halted, successfully.\n";*)
   
   begin

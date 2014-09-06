@@ -192,6 +192,23 @@ let setupinp (princs:string list) (env:(string * typ) list) :(circuit * (string 
       | T_sh(_, typnd) -> sz + size_env typnd.data
       | _ -> sz
     ) 0 env in
+
+  (*
+   * if total shares size is 0, and some party does not have an input
+   * to contribute to this secure block, raise an error: GMW requires
+   * each party to have some input
+   *)
+  let _ =
+    if totalshsz = 0 then
+      try
+	let p = List.find
+	  (fun p -> not(StringMap.mem p wmap)) sortedprincs in
+	
+	raise (CGenError ("GMW library requires each party to have inputs to the secure blocks. Principal " ^ p ^ " does not contribute to the secure block"))
+      
+      with
+	| Not_found -> ()
+  in  
   
   (*
    * create circuit elements for share inputs
