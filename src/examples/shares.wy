@@ -1,4 +1,4 @@
-let all = {!Alice, !Bob} in
+let all = {!Alice, !Bob, !Charlie} in
 
 let w = wire all:100 in
 
@@ -8,6 +8,7 @@ let o @ sec(all) =
 in
 
 let m @ sec(all) =
+  let t   = w[!Alice] in
   let v   = combsh o in
   let inc = v + 1 in
   let out = makesh inc in  
@@ -15,6 +16,7 @@ let m @ sec(all) =
 in
 
 let f @ sec(all) =
+  let t   = w[!Alice] in
   let out = combsh m in
   out
 in
