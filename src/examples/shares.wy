@@ -1,13 +1,39 @@
 let all = {!Alice, !Bob, !Charlie} in
+let v = { #f : 3, #g : 4 } in
 
-let w = wire all:100 in
+let w = wire all:v in
 
+(* __me__ is a special variable that is principal's name at runtime *)
+let wrcmd = sysop strcat "cat > shfile_" __me__ in
+let writer = sysop run wrcmd in
+
+(* o contains shares of the record v *)
 let o @ sec(all) =
   let out = makesh w[!Alice] in
   out
 in
 
+(* each principal writes shares to file *)
+let _ = sysop send writer o in
+
+let rdcmd = sysop strcat "cat < shfile_" __me__ in
+let reader = sysop run rdcmd in
+
+(* read shares back in o1 *)
+let o1 = sysop recv (Sh all {#f:nat,#g:nat}) reader in
+
+(* combine shares and return the g field + 1 *)
 let m @ sec(all) =
+  let t = w[!Alice] in (* dummy expr *)
+  let r = combsh o1 in
+  let t1 = r.#g in
+  let t2 = t1 + 1 in
+  t2
+in
+
+m
+
+(*let m @ sec(all) =
   let t   = w[!Alice] in
   let v   = combsh o in
   let inc = v + 1 in
@@ -22,3 +48,4 @@ let f @ sec(all) =
 in
 
 f
+*)

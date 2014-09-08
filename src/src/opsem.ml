@@ -641,6 +641,11 @@ module Make (Flags:OPSEM_FLAGS) = struct
 
         | "recv" ->
             begin match typ_op, vals with
+	      | Some { data = T_sh(v, t) }, [{data=V_proc(p)}] ->
+		(* TODO: type checking shares ????*)
+		let str = Proc.recv p in
+		let vnd = astgen (V_sh(Bytes.of_string str)) (T_sh(v, t)) in
+		vnd
               | Some typ, [{data=V_proc(p)}] ->
                   let str = Proc.recv p in
                   let vnd = parse_value ("sysop recv") str in

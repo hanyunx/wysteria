@@ -6,9 +6,9 @@ let mkdeal =  \(x:ps{true}).
 
   let dummy = wire x:0 in
   let zerosh @ par(x) =  (* GMW bug, needs inputs for each party and AND gates *)
-    let y = dummy in
-    let y1 = 2 + 2 in
-    let zerosh1 @ sec(x) = makesh 0 in
+    (*let y = dummy in
+    let y1 = 2 + 2 in*)
+    let zerosh1 @ sec(x) = let y = dummy in makesh 0 in
     zerosh1
   in
 
@@ -63,7 +63,7 @@ let mkdeal =  \(x:ps{true}).
 	  let dummy1 = wire x:0 in
           let card @ sec(x) = 
 	    let y = dummy1 in
-	    let y1 = 2 + 2 in
+	    (*let y1 = 2 + 2 in*)
             let s = combsh (res.#sum) in
             wire tgt:s
           in
@@ -84,7 +84,7 @@ let mkdeal =  \(x:ps{true}).
 	       let w1 @ par(x) =
 		 let w2 @ sec(x) =
 		   let y2 = dummy4 in
-		   let n3 = 2 + 2 in
+		   (*let n3 = 2 + 2 in*)
 		   let card = combsh card_sh in
 		   wire x:card
 		 in

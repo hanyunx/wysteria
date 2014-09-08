@@ -199,15 +199,14 @@ let setupinp (princs:string list) (env:(string * typ) list) :(circuit * (string 
    * each party to have some input
    *)
   let _ =
-    if totalshsz = 0 then
-      try
-	let p = List.find
-	  (fun p -> not(StringMap.mem p wmap)) sortedprincs in
-	
-	raise (CGenError ("GMW library requires each party to have inputs to the secure blocks. Principal " ^ p ^ " does not contribute to the secure block"))
+    try
+      let p = List.find
+	(fun p -> not(StringMap.mem p wmap)) sortedprincs in
       
-      with
-	| Not_found -> ()
+      raise (CGenError ("GMW library requires each party to have inputs to the secure blocks. Principal " ^ p ^ " does not contribute to the secure block"))
+	
+    with
+      | Not_found -> ()
   in  
   
   (*
@@ -1016,10 +1015,12 @@ let rec parseoutput (arr:string array) (sharr:char array) (princ:string) (t:typ)
 
     | T_sh(_, tnd) ->
       let sz = size_env tnd.data in
-      if sz > 0 then
-	tastnd (V_sh(Array.to_list (Array.sub sharr 0 sz))) t, arr, (Array.sub sharr sz (Array.length sharr - sz))
+      if sz > 0 then	
+	tastnd (V_sh(Bytes.init sz (fun i -> sharr.(i)))) t, arr, (Array.sub sharr sz (Array.length sharr - sz))
+	(*tastnd (V_sh(Array.to_list (Array.sub sharr 0 sz))) t, arr, (Array.sub sharr sz (Array.length sharr - sz))*)
       else
-	tastnd (V_sh([])) t, arr, sharr
+	tastnd (V_sh(Bytes.empty)) t, arr, sharr
+	(*tastnd (V_sh([])) t, arr, sharr*)
 
     | T_ps(_) ->
       let n = bintoint (Array.to_list (Array.sub arr 0 natsize)) in
@@ -1160,8 +1161,8 @@ let runsecblk (princ:string) (princs:string list) (renv:env) (tenv:(string * typ
 	let vnd = (Env.find (Var(varname)) renv).value in
 	begin
 	  match vnd.data with
-	    | V_sh(l) ->
-	      List.iter (fun c -> output_char shfout c) l;
+	    | V_sh(b) ->
+	      Bytes.iter (fun c -> output_char shfout c) b;
 	      n    (* share input don't count in input size *)
 
 	    | _ -> raise (Not_found)

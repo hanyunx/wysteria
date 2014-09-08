@@ -67,7 +67,7 @@ and value =
   | V_paren    of value_nd        
   | V_clos     of clos
   | V_wires    of (princ_nd * value_nd) list
-  | V_sh       of char list
+  | V_sh       of Bytes.t
   | V_proc     of Proc.t
 
   (* closures *)
@@ -341,7 +341,7 @@ type 'b value_maps = {
   v_paren    : 'b -> 'b ;
   v_clos     : clos -> 'b ;
   v_wires    : (princ_nd * 'b) list -> 'b ;
-  v_sh       : char list -> 'b ;
+  v_sh       : Bytes.t -> 'b ;
   v_proc     : Proc.t -> 'b
 }
 
@@ -1225,7 +1225,7 @@ module Pretty = struct
       pp_lam_nd c.clos_lam ;
       ps ")" ;
     | V_sh l ->
-      ps "sh "; print_int (List.length l);
+      ps "sh "; print_int (Bytes.length l);
     | V_wires pvs ->
       ps "[" ;
       pp_list begin fun (p,v) ->
@@ -1542,7 +1542,8 @@ module Pretty = struct
           string_of_value_nd v @@
           ps ")"
       | V_sh l ->
-          ps "sh " @@ string_of_int (List.length l)
+          (*ps "sh " @@ string_of_int (List.length l)*)
+	ps (Bytes.to_string l)
       | V_wires pvs ->
           ps "[" @@
           string_of_list begin fun (p,v) ->

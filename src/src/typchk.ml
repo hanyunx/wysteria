@@ -1260,9 +1260,15 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd * tenv
 		pp_value_nd tv; print_string " has type "; pp_typ tv.info)
 
 	    else
-	      tastnd exnd.prov (E_sysop(varnd, typop, [tv])) typ.data,
-	      astnd exnd.prov Ef_emp,
-	      env
+	      let t, b = wellformedtyp typ.data plc env in
+	      if not (b) then
+		errf typ.prov (fun _ ->
+		  print_string "type "; pp_typ_nd typ; print_string " is not well-formed")
+
+	      else
+		tastnd exnd.prov (E_sysop(varnd, Some(astnd typ.prov t), [tv])) t,
+		astnd exnd.prov Ef_emp,
+		env
 	  | _ -> errf exnd.prov (fun _ ->
 	    print_string "recv expects a type and a single argument of type T_proc while found ";
 	    print_int (List.length l); print_string " arguments")
