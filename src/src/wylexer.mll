@@ -107,6 +107,7 @@ rule token = parse
   | "update" { UPDATE }
   | "print"  { PRINT }
   | "sysop"  { SYSOP }
+  | "subset" { SUBSET }
   | "Sh"   { TSH }
   | "makesh" { MAKESH }
   | "combsh" { COMBSH }

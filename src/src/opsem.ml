@@ -506,6 +506,7 @@ module Make (Flags:OPSEM_FLAGS) = struct
         e_sysop  = begin fun (vr, tyop, l)   -> g (E_sysop(vr, tyop, l)) end ;
 
         e_cast   = begin fun (e, t)          -> env, fun y -> g(E_cast (y, t)) end ;
+        e_subset = begin fun (e1,e2,e3)      -> env, env, env, fun y1 y2 y3 -> g (E_subset (y1, y2, y3)) end ;
 
         (* XFORM case: Application chain ~~> let-binding chain. *)
         e_app = begin fun (apphd, e2) -> env, env, fun _ e2' ->
@@ -1314,5 +1315,34 @@ module Make (Flags:OPSEM_FLAGS) = struct
         let v = exec_sysop sysopname typ_op closed_vals in
         { cfg with expr = astgen' (E_value v) }
       end
+
+      | E_subset (e1, e2, e3) when (expr_is_value cfg e1.data && expr_is_value cfg e2.data && expr_is_value cfg e2.data) ->
+	begin
+	  match (close_value_of_expr cfg e1.data, close_value_of_expr cfg e2.data, close_value_of_expr cfg e3.data) with
+	    | Some(v1), Some({data = V_nat(v2)}), Some({data = V_nat(v3)}) when v2 >= 0 && v3 >= 0 && v2 <= v3 ->
+	      let l = ps_value_princs v1 in
+	      (* get index v2 to v3 in l *)
+	      let rec get_index l n1 n2 curr =
+		if n1 = n2 + 1 then
+		  []
+		else if n1 > curr then match l with
+		  | [] -> raise (Stuck cfg)
+		  | x::l1 -> get_index l1 n1 n2 (curr + 1)
+		else match l with
+		  | [] -> raise (Stuck cfg)
+		  | x::l1 -> x::(get_index l1 (n1 + 1) n2 (curr + 1))
+	      in
+	      let l1 = get_index l v2 v3 0 in
+	      let l2 = List.map (fun p -> astgen' (V_princ p)) l1 in
+              { cfg with expr = astgen' (E_value (astgen' (V_ps_lit(l2)))) }
+	    | _ -> raise (Stuck cfg)
+	end
+      | E_subset (e1, e2, e3) when (expr_is_value cfg e1.data && expr_is_value cfg e2.data) ->
+          stk_push cfg e3 (fun e -> astgen' (E_subset (e1, e2, e)))
+      | E_subset (e1, e2, e3) when (expr_is_value cfg e1.data) ->
+          stk_push cfg e2 (fun e -> astgen' (E_subset (e1, e, e3)))
+      | E_subset (e1, e2, e3) ->
+          stk_push cfg e1 (fun e -> astgen' (E_subset (e, e2, e3)))
+
 
 end

@@ -35,6 +35,10 @@ let lookupenv (env:tenv) (varnd:var_nd) :envbnd =
   with
     | Not_found -> err varnd.prov ("Variable not found: " ^ s)
 
+let isprinc (t: typ) :bool = match t with
+  | T_ps(_) -> true
+  | _ -> false
+
 let isprinctyp (v:value_nd) :bool = match v.info with
   | T_ps(_) -> true
 
@@ -1197,6 +1201,30 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd * tenv
       let te, eff, _ = typex e plc env in
       tastnd exnd.prov (E_print(te)) T_unit, eff, env
 
+    | E_subset(e1, e2, e3) ->
+      let te1, eff1, _ = typex e1 plc env in
+      let te2, eff2, _ = typex e2 plc env in
+      let te3, eff3, _ = typex e3 plc env in
+
+      (* TODO: assert that effects are non-empty ? *)
+
+      if not (isprinc te1.info) then
+	errf te1.prov (fun _ ->
+	  print_string "subset expects first argument of type T_ps while expression " ; pp_expr_nd te1; print_string " has type "; pp_typ te1.info)
+
+      else if not (te2.info = T_nat) then
+	errf te2.prov (fun _ ->
+	  print_string "subset expects second argument of type T_nat while expression " ; pp_expr_nd te2; print_string " has type "; pp_typ te2.info)
+
+      else if not (te3.info = T_nat) then
+	errf te3.prov (fun _ ->
+	  print_string "subset expects third argument of type T_nat while expression " ; pp_expr_nd te3; print_string " has type "; pp_typ te3.info)
+
+      else
+	tastnd exnd.prov (E_subset(te1, te2, te3)) (T_ps(astnd exnd.prov R_true)),
+	normalizeeff (combeff3 eff1 eff2 eff3 exnd.prov) plc env,
+	env
+
     | E_sysop(varnd, typop, l) ->
       let opname = varname varnd in
 
@@ -1326,6 +1354,7 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd * tenv
 
       else
 	errf exnd.prov (fun _ -> print_string ("Sysop " ^ opname ^ " not supported"))
+	  
       
     | _ -> errf exnd.prov (fun _ -> print_string "Type checker could not type ";
       pp_expr_nd exnd)

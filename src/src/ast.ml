@@ -174,7 +174,8 @@ and expr =
   | E_wfold of value_nd * expr_nd * expr_nd * lam_nd (* wire folding *)
   | E_paren of expr_nd
 
-  | E_cast of expr_nd * typ_nd
+  | E_cast   of expr_nd * typ_nd
+  | E_subset of expr_nd * expr_nd * expr_nd
 
 and natop_nd = natop astnd
 and natop =
@@ -652,6 +653,7 @@ type ('a,'b) expr_folders' = {
   e_sysop  : var_nd * typ_nd option * (value_nd list) -> 'b;
 
   e_cast   : expr_nd * typ_nd -> ('a * ('b -> 'b));
+  e_subset : expr_nd * expr_nd * expr_nd -> ('a * 'a * 'a * ('b -> 'b -> 'b -> 'b)) ;
 }
     
 and ('a, 'b) expr_folders = 'a -> ('a, 'b) expr_folders'
@@ -818,6 +820,13 @@ let rec fold_expr : (expr_nd -> ('a,'b) expr_folders) -> expr_nd -> 'a -> 'b
         let y = fold_expr f e x in
         cont y
 
+      | E_subset(e1,e2,e3) ->
+        let x1, x2, x3, cont = f'.e_subset (e1,e2,e3) in
+        let y1 = fold_expr f e1 x1 in
+        let y2 = fold_expr f e2 x2 in
+        let y3 = fold_expr f e3 x3 in
+        cont y1 y2 y3
+
     end
 
 let expr_copy_folders e : (unit, expr_nd) expr_folders = 
@@ -871,6 +880,8 @@ let expr_copy_folders e : (unit, expr_nd) expr_folders =
       e_sysop  = begin fun (vr,tyop,l)    -> g (E_sysop (vr, tyop, l)) end ;
 
       e_cast   = begin fun (e,t)          -> (), fun y -> g(E_cast (y,t)) end ;   
+      e_subset = begin fun (e1,e2,e3)     -> (), (), (), fun y1 y2 y3 -> g (E_subset (y1, y2, y3)) end ;
+
     }
 
 (* NOTE!: Assumes that program variables are all unique! *)
@@ -923,6 +934,7 @@ let rec expr_close_sel closef e =
     | E_paren(e1) -> E_paren(expr_close_sel closef e1)
 
     | E_cast(e1, t) -> E_cast(expr_close_sel closef e1, t)
+    | E_subset(e1, e2, e3) -> E_subset(expr_close_sel closef e1, expr_close_sel closef e2, expr_close_sel closef e3)
   in
   { prov = e.prov; data = edata; info = closed_typ }
 
@@ -1002,6 +1014,7 @@ let expr_free_vars' e : varval list -> varval list =
     e_sysop  = begin fun (vr, tyop, l)   -> List.fold_left (fun y v -> app y (AstMap.free_vars' v)) emp l end;
 
     e_cast   = begin fun (e, t)          -> (), fun y -> y end ;
+    e_subset = begin fun (e1, e2, e3)    -> (), (), (), fun y1 y2 y3 -> app y1 (app y2 y3) end ;
   }
   in
   (fold_expr folders e ())
@@ -1068,6 +1081,7 @@ let expr_free_var_set e  =
     e_sysop  = begin fun (vr, tyop, l)   -> bv_filter bv (List.fold_left (fun y v -> app y (AstMap.free_var_set v)) emp l) end;
 
     e_cast   = begin fun (e, t)        -> bv, fun y -> y end ;
+    e_subset = begin fun (e1, e2, e3)    -> bv, bv, bv, (fun x y z -> app x (app y z)) end ;
   }
   in
   (fold_expr folders e BoundVars.empty)
@@ -1478,6 +1492,14 @@ module Pretty = struct
         | Some t -> (pp_typ_nd t ; ps " ")
       end ;
       List.iter (fun v -> pp_value_nd v; ps " ") l
+
+    | E_subset (e1, e2, e3) -> 
+      ps "subset " ;
+      pp_expr_nd e1 ;
+      ps " " ;
+      pp_expr_nd e2 ;
+      ps " " ;
+      pp_expr_nd e3
 
 
   and pp_app_nd n = pp_app n.data

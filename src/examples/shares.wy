@@ -1,37 +1,49 @@
+(* run as: ./bin/wysteria examples/shares.wy *)
+
 let all = {!Alice, !Bob, !Charlie} in
-let v = { #f : 3, #g : 4 } in
+let all1 = subset all 0 1 in
+let all2 = subset all 1 1 in
+let all3 = subset all1 0 0 in
+(*  are runtime errors *)
+(* let all4 = subset all 4 0 in *)
+(* let all5 = subset all 0 4 in *)
+{#f:all1, #g:all2, #h:all3}
 
-let w = wire all:v in
 
-(* __me__ is a special variable that is principal's name at runtime *)
-let wrcmd = sysop strcat "cat > shfile_" __me__ in
-let writer = sysop run wrcmd in
 
-(* o contains shares of the record v *)
-let o @ sec(all) =
-  let out = makesh w[!Alice] in
-  out
-in
+(* let v = { #f : 3, #g : 4 } in *)
 
-(* each principal writes shares to file *)
-let _ = sysop send writer o in
+(* let w = wire all:v in *)
 
-let rdcmd = sysop strcat "cat < shfile_" __me__ in
-let reader = sysop run rdcmd in
+(* (\* __me__ is a special variable that is principal's name at runtime *\) *)
+(* let wrcmd = sysop strcat "cat > shfile_" __me__ in *)
+(* let writer = sysop run wrcmd in *)
 
-(* read shares back in o1 *)
-let o1 = sysop recv (Sh all {#f:nat,#g:nat}) reader in
+(* (\* o contains shares of the record v *\) *)
+(* let o @ sec(all) = *)
+(*   let out = makesh w[!Alice] in *)
+(*   out *)
+(* in *)
 
-(* combine shares and return the g field + 1 *)
-let m @ sec(all) =
-  let t = w[!Alice] in (* dummy expr *)
-  let r = combsh o1 in
-  let t1 = r.#g in
-  let t2 = t1 + 1 in
-  t2
-in
+(* (\* each principal writes shares to file *\) *)
+(* let _ = sysop send writer o in *)
 
-m
+(* let rdcmd = sysop strcat "cat < shfile_" __me__ in *)
+(* let reader = sysop run rdcmd in *)
+
+(* (\* read shares back in o1 *\) *)
+(* let o1 = sysop recv (Sh all {#f:nat,#g:nat}) reader in *)
+
+(* (\* combine shares and return the g field + 1 *\) *)
+(* let m @ sec(all) = *)
+(*   let t = w[!Alice] in (\* dummy expr *\) *)
+(*   let r = combsh o1 in *)
+(*   let t1 = r.#g in *)
+(*   let t2 = t1 + 1 in *)
+(*   t2 *)
+(* in *)
+
+(* m *)
 
 (*let m @ sec(all) =
   let t   = w[!Alice] in
