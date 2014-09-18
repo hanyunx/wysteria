@@ -1340,9 +1340,9 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd * tenv
 	  | None, [v1; v2] ->
 	    let tv1 = typv v1 plc env in
 	    let tv2 = typv v2 plc env in
-	    if not (tv1.info = T_string && tv2.info = T_string) then
+	    if not ((tv1.info = T_string || tv1.info = T_nat) && (tv2.info = T_string || tv2.info = T_nat)) then
 	      errf tv1.prov (fun _ ->
-		print_string "strcat expects arguments of type T_string while value ";
+		print_string "strcat expects arguments of type T_string or T_nat while value ";
 		pp_value_nd tv1; print_string " has type "; pp_typ tv1.info; print_string " and value "; pp_value_nd tv2; print_string " has type "; pp_typ tv2.info)
 	    else
 	      tastnd exnd.prov (E_sysop(varnd, typop, [tv1; tv2])) T_string,

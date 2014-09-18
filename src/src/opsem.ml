@@ -679,10 +679,19 @@ module Make (Flags:OPSEM_FLAGS) = struct
             end
 
 	| "strcat" ->
+	  let strcat s1 s2 =
+	    let delim = String.make 1 '"' in
+	    parse_value ("sysop strcat") (delim ^ s1 ^ s2 ^ delim)
+	  in
 	  begin match typ_op, vals with
 	    | None, [{data=V_string(s1)}; {data=V_string(s2)}] ->
-	      let delim = String.make 1 '"' in
-	      parse_value ("sysop strcat") (delim ^ s1 ^ s2 ^ delim)
+	      strcat s1 s2
+	    | None, [{data=V_nat(s1)}; {data=V_string(s2)}] ->
+	      strcat (string_of_int s1) s2
+	    | None, [{data=V_string(s1)}; {data=V_nat(s2)}] ->
+	      strcat s1 (string_of_int s2)
+	    | None, [{data=V_nat(s1)}; {data=V_nat(s2)}] ->
+	      strcat (string_of_int s1) (string_of_int s2)
 	    | _ -> raise (Stuck cfg)
 	  end
 
