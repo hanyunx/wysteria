@@ -909,6 +909,8 @@ let getbooleanckt = function
 	(*bckt @ [copy (fst r3) c]*)
 	List.rev_append ((copy (fst r3) c)::rbckt) []
 
+      | _ -> raise (CGenError "Unsupported natop")
+
 (*
  * dumps bit representation of v in the file
  * caller has already taken out value from a wire bundle before calling it

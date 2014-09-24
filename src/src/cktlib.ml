@@ -90,6 +90,7 @@ let printcktelt = function
 	| Natop_sub -> print_string "SUB "
 	| Natop_gt -> print_string "GT "
 	| Natop_equals -> print_string "EQ "
+	| _ -> raise (CLibError "Unsupported circuit gate")
     end;
     printwrange r1; print_string " "; printwrange r2; print_string " "; printwrange r3;
   | Mux(r1, r2, r3, r4) ->

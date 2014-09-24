@@ -707,6 +707,8 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd * tenv
 	let optyp = match opnd.data with
 	  | Natop_plus -> T_nat
 	  | Natop_sub -> T_nat
+	  | Natop_mult -> T_nat
+	  | Natop_div -> T_nat
 	  | Natop_gt -> T_bool
 	  | Natop_equals -> T_bool
 	in

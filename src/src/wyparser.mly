@@ -36,7 +36,7 @@ let astnd thing start_pos end_pos =
 
 %token DOT 
 %token COMMA 
-%token ARROW MINUS
+%token ARROW MINUS MULT DIV
 %token EQUALS
 %token IF THEN ELSE
 
@@ -238,6 +238,8 @@ expr:
 natop:
 | PLUS    { astnd Ast.Natop_plus 1 1 }
 | MINUS   { astnd Ast.Natop_sub 1 1 }
+| MULT    { astnd Ast.Natop_mult 1 1 }
+| DIV     { astnd Ast.Natop_div 1 1 }
 | GT      { astnd Ast.Natop_gt 1 1 }
 | EQUALS  { astnd Ast.Natop_equals 1 1 }
 ;

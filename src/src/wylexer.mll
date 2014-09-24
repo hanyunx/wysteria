@@ -56,6 +56,8 @@ rule token = parse
   | "-" { MINUS }
   | ','  { COMMA }
   | "+" { PLUS }
+  | "*" { MULT }
+  | "/" { DIV }
   | ">" { GT }
   | "unit" { TUNIT }
   | "nat" { TNAT }

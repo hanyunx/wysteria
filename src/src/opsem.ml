@@ -1003,6 +1003,12 @@ module Make (Flags:OPSEM_FLAGS) = struct
                     { cfg with expr = astgen' (E_value v) }
 		  else
 		    raise (Stuck cfg)
+                | Natop_mult ->
+                  let v = astgen (V_nat (n1 * n2)) dummyinfo in
+                  { cfg with expr = astgen' (E_value v) }
+                | Natop_div ->
+                  let v = astgen (V_nat (n1 / n2)) dummyinfo in
+                  { cfg with expr = astgen' (E_value v) }
                 | Natop_gt ->
                   let v = astgen (V_bool (n1 > n2)) dummyinfo in
                   { cfg with expr = astgen' (E_value v) }

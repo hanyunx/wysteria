@@ -181,6 +181,8 @@ and natop_nd = natop astnd
 and natop =
   | Natop_plus
   | Natop_sub
+  | Natop_mult
+  | Natop_div
   | Natop_gt
   | Natop_equals
 
@@ -1408,6 +1410,8 @@ module Pretty = struct
       ( match op.data with
         | Natop_plus -> ps " + " 
 	| Natop_sub -> ps " - "
+	| Natop_mult -> ps " * "
+	| Natop_div -> ps " / "
         | Natop_gt -> ps " > " 
         | Natop_equals -> ps " = " ) ;
       pp_expr_nd e2            
