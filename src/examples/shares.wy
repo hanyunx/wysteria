@@ -1,14 +1,25 @@
 (* run as: ./bin/wysteria examples/shares.wy *)
 
 let all = {!Alice, !Bob, !Charlie} in
-let all1 = subset all 0 1 in
-let all2 = subset all 1 1 in
-let all3 = subset all1 0 0 in
+let all1 = subset all from 0 to 1 in
+let all2 = subset all from 1 to 1 in
+let all3 = subset all1 from 0 to 0 in
 (*  are runtime errors *)
 (* let all4 = subset all 4 0 in *)
 (* let all5 = subset all 0 4 in *)
 {#f:all1, #g:all2, #h:all3}
 
+(*let w1 = wire {!Alice}:11 in
+let w2 = wire {!Bob}:13 in
+let w3 = w1 ++ w2 in
+
+let o @ sec({!Alice,!Bob}) =
+  let x = w3[!Alice] in
+  let y = w3[!Bob] in
+  x * y
+in
+
+o*)
 
 
 (* let v = { #f : 3, #g : 4 } in *)

@@ -708,7 +708,11 @@ let rec typex (exnd:expr_nd) (plc:place_nd) (env:tenv) :(expr_nd * eff_nd * tenv
 	  | Natop_plus -> T_nat
 	  | Natop_sub -> T_nat
 	  | Natop_mult -> T_nat
-	  | Natop_div -> T_nat
+	  | Natop_div -> begin
+	    print_string "WARNING: Only div 2 is supported in secure blocks\n";
+	    print_newline ();
+	    T_nat
+	  end
 	  | Natop_gt -> T_bool
 	  | Natop_equals -> T_bool
 	in

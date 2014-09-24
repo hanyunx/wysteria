@@ -32,7 +32,7 @@ let astnd thing start_pos end_pos =
 %token ARRAY SELECT UPDATE LEFT_ARR OF
 %token TSH MAKESH COMBSH
 %token FOR TO DO DONE WHILE 
-%token PRINT SYSOP SUBSET
+%token PRINT SYSOP SUBSET FROM TO
 
 %token DOT 
 %token COMMA 
@@ -266,7 +266,7 @@ expr_:
 | expr_ DOT field                                   { astnd( Ast.E_proj ($3, $1) ) 1 3 }
 | expr_ LBRACKET expr RBRACKET                      { astnd( Ast.E_wproj ($1, $3) ) 1 4 }
 | expr__                                            { $1 }
-| SUBSET expr expr expr                             { astnd (Ast.E_subset($2, $3, $4)) 1 4 }
+| SUBSET expr FROM expr TO expr                     { astnd (Ast.E_subset($2, $4, $6)) 1 6 }
 
 /*| FOR var EQUALS value TO value DO var COLON expr DONE { astnd( Ast.Macros.forloopf $2 $4 $6 $8 $10 ) 1 11 }*/
 ;

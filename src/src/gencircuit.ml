@@ -632,9 +632,9 @@ let rec genex (env:(string * wrange) list) (exnd:expr_nd) :(circuit * wrange) =
     | E_natop(opnd, e1, e2) ->
       let (ckt1, r1) = genex env e1 in
       let (ckt2, r2) = genex env e2 in
-      
+   
       let r =
-	if opnd.data = Natop_plus || opnd.data = Natop_sub then
+	if opnd.data = Natop_plus || opnd.data = Natop_sub || opnd.data = Natop_mult || opnd.data = Natop_div then
 	  walloc.getn natsize
 	else
 	  walloc.getn boolsize
@@ -744,172 +744,247 @@ let rec genex (env:(string * wrange) list) (exnd:expr_nd) :(circuit * wrange) =
  * given a circuit, return a boolean circuit
  * the constructions are in the GMW paper
  *)
-let getbooleanckt = function
-  | Input(s, r) -> [INPUT(s, r)]
-  | Output(s, r) -> [OUTPUT(s, r)]
-  | ShInput(r) -> [SHINPUT(r)]
-  | ShOutput(r) -> [SHOUTPUT(r)]
-  | Copy(r1, r2) ->
-    if rsize r1 > 0 then
-      let l1 = rangetolist r1 in
-      let l2 = rangetolist r2 in
-      
-      (*List.fold_left2 (fun c i1 i2 -> c @ [copy i1 i2]) [] l1 l2*)
-      List.rev_append (List.fold_left2 (fun c i1 i2 -> (copy i1 i2)::c) [] l1 l2) []
-    else
-      []
-  | Const(r, n) ->
-    if rsize r > 0 then
-      let l1 = rangetolist r in
-      let l2 =
-	if rsize r = natsize then
-	  inttobin n
-	else
-	  [n]	    
-      in
-      
-      (*List.fold_left2 (fun c i1 i2 -> c @ [copy i1 i2]) [] l1 l2*)
-      List.rev_append (List.fold_left2 (fun c i1 i2 -> (copy i1 i2)::c) [] l1 l2) []
-    else
-      []      
-  | Mux(r3, r1, r2, r4) ->    
+let getbooleanckt elt =
+  let get_add_circuit r1 r2 r3 =
     let l1 = rangetolist r1 in
     let l2 = rangetolist r2 in
     let l3 = rangetolist r3 in
 
-    let f (c, out) b1 b2 =
-      let t1 = wireone in
+    let f (ckt, out, c) b1 b2 =
+      let (t1, _) = walloc.getn 1 in
+      let g1 = XOR(t1, b1, c) in
       let (t2, _) = walloc.getn 1 in
-      let g1 = XOR(t2, t1, (fst r4)) in
+      let g2 = XOR(t2, b2, c) in
       let (t3, _) = walloc.getn 1 in
-      let g2 = XOR(t3, b1, b2) in
+      let g3 = AND(t3, t1, t2) in
+      let (c1, _) = walloc.getn 1 in
+      let g4 = XOR(c1, t3, c) in
       let (t4, _) = walloc.getn 1 in
-      let g3 = AND(t4, t2, t3) in
-      let (t5, _) = walloc.getn 1 in
-      let g4 = XOR(t5, t4, b2) in
-      (*(c @ [g1; g2; g3; g4], out @ [t5])*)
-      g4::g3::g2::g1::c, t5::out
+      let g5 = XOR(t4, b1, b2) in
+      let (s, _) = walloc.getn 1 in
+      let g6 = XOR(s, t4, c) in
+      (*(ckt @ [g1; g2; g3; g4; g5; g6], out @ [s], c1)*)
+      g6::g5::g4::g3::g2::g1::ckt, s::out, c1
     in
 
-    (*let (bckt, out) = List.fold_left2 f ([], []) l1 l2 in*)
-    let (rbckt, rout) = List.fold_left2 f ([], []) l1 l2 in
+    (*let (bckt, out, _) = List.fold_left2 f ([], [], wirezero) l1 l2 in*)
+    let (rbckt, rout, _) = List.fold_left2 f ([], [], wirezero) l1 l2 in	
     let (bckt, out) = List.rev_append rbckt [], List.rev_append rout [] in
     
     (*let f ckt b1 b2 = ckt @ [copy b1 b2] in*)
     let f ckt b1 b2 = (copy b1 b2)::ckt in
-    List.rev_append (List.fold_left2 f bckt l3 out) []
+    let l = List.rev_append (List.fold_left2 f bckt l3 out) [] in
+    l
+  in
 
-  | Gate(op, r3, r1, r2) ->
-    match op with
-      | Natop_plus ->
+  match elt with
+    | Input(s, r) -> [INPUT(s, r)]
+    | Output(s, r) -> [OUTPUT(s, r)]
+    | ShInput(r) -> [SHINPUT(r)]
+    | ShOutput(r) -> [SHOUTPUT(r)]
+    | Copy(r1, r2) ->
+      if rsize r1 > 0 then
 	let l1 = rangetolist r1 in
 	let l2 = rangetolist r2 in
-	let l3 = rangetolist r3 in
-
-	let f (ckt, out, c) b1 b2 =
-	  let (t1, _) = walloc.getn 1 in
-	  let g1 = XOR(t1, b1, c) in
-	  let (t2, _) = walloc.getn 1 in
-	  let g2 = XOR(t2, b2, c) in
-	  let (t3, _) = walloc.getn 1 in
-	  let g3 = AND(t3, t1, t2) in
-	  let (c1, _) = walloc.getn 1 in
-	  let g4 = XOR(c1, t3, c) in
-	  let (t4, _) = walloc.getn 1 in
-	  let g5 = XOR(t4, b1, b2) in
-	  let (s, _) = walloc.getn 1 in
-	  let g6 = XOR(s, t4, c) in
-	  (*(ckt @ [g1; g2; g3; g4; g5; g6], out @ [s], c1)*)
-	  g6::g5::g4::g3::g2::g1::ckt, s::out, c1
-	in
-
-	(*let (bckt, out, _) = List.fold_left2 f ([], [], wirezero) l1 l2 in*)
-	let (rbckt, rout, _) = List.fold_left2 f ([], [], wirezero) l1 l2 in	
-	let (bckt, out) = List.rev_append rbckt [], List.rev_append rout [] in
 	
-	(*let f ckt b1 b2 = ckt @ [copy b1 b2] in*)
-	let f ckt b1 b2 = (copy b1 b2)::ckt in
-	List.rev_append (List.fold_left2 f bckt l3 out) []
-
-      | Natop_sub ->
-	let l1 = rangetolist r1 in
-	let l2 = rangetolist r2 in
-	let l3 = rangetolist r3 in
-
-	let f (ckt, out, c) b1 b2 =
-	  let (t1, _) = walloc.getn 1 in
-	  let g1 = XOR(t1, b1, c) in
-	  let (t2, _) = walloc.getn 1 in
-	  let g2 = XOR(t2, b2, c) in
-	  let (t3, _) = walloc.getn 1 in
-	  let g3 = AND(t3, t1, t2) in
-	  let (c1, _) = walloc.getn 1 in
-	  let g4 = XOR(c1, t3, b1) in
-	  let (t4, _) = walloc.getn 1 in
-	  let g5 = XOR(t4, b1, b2) in
-	  let (t5, _) = walloc.getn 1 in
-	  let g6 = XOR(t5, t4, c) in
-	  let (s, _) = walloc.getn 1 in
-	  let g7 = XOR(s, t5, wireone) in
-	  (*(ckt @ [g1; g2; g3; g4; g5; g6; g7], out @ [s], c1)*)
-	  g7::g6::g5::g4::g3::g2::g1::ckt, s::out, c1
-	in
-
-	(*let (bckt, out, _) = List.fold_left2 f ([], [], wireone) l1 l2 in*)
-	let (rbckt, rout, _) = List.fold_left2 f ([], [], wireone) l1 l2 in
-	let bckt, out = List.rev_append rbckt [], List.rev_append rout [] in
-
-	(*let f ckt b1 b2 = ckt @ [copy b1 b2] in*)
-	let f ckt b1 b2 = (copy b1 b2)::ckt in
-	List.rev_append (List.fold_left2 f bckt l3 out) []
-
-      | Natop_gt -> 
-	let l1 = rangetolist r1 in
-	let l2 = rangetolist r2 in
-
-	let f (ckt, c) b1 b2 =
-	  let (t1, _) = walloc.getn 1 in
-	  let g1 = XOR(t1, b1, c) in
-	  let (t2, _) = walloc.getn 1 in
-	  let g2 = XOR(t2, b2, c) in
-	  let (t3, _) = walloc.getn 1 in
-	  let g3 = AND(t3, t1, t2) in
-	  let (c1, _) = walloc.getn 1 in
-	  let g4 = XOR(c1, t3, b1) in
-	  (*(ckt @ [g1; g2; g3; g4], c1)*)
-	  g4::g3::g2::g1::ckt, c1
-	in
-
-	(*let (bckt, c) = List.fold_left2 f ([], wirezero) l1 l2 in*)
-	let (rbckt, c) = List.fold_left2 f ([], wirezero) l1 l2 in
-	
-	(*bckt @ [copy (fst r3) c]*)
-	List.rev_append ((copy (fst r3) c)::rbckt) []
-
-      | Natop_equals -> 
-	let l1 = rangetolist r1 in
-	let l2 = rangetolist r2 in
-
-	let f (ckt, c) b1 b2 =
-	  let (t1, _) = walloc.getn 1 in
-	  let g1 = XOR(t1, b1, b2) in
-	  let (t2, _) = walloc.getn 1 in
-	  let g2 = copy t2 1 in
-	  let (t3, _) = walloc.getn 1 in
-	  let g3 = XOR(t3, t1, t2) in
-	  let (c1, _) = walloc.getn 1 in
-	  let g4 = AND(c1, t3, c) in
-	  (*(ckt @ [g1; g2; g3; g4], c1)*)
-	  g4::g3::g2::g1::ckt, c1
+	(*List.fold_left2 (fun c i1 i2 -> c @ [copy i1 i2]) [] l1 l2*)
+	List.rev_append (List.fold_left2 (fun c i1 i2 -> (copy i1 i2)::c) [] l1 l2) []
+      else
+	[]
+    | Const(r, n) ->
+      if rsize r > 0 then
+	let l1 = rangetolist r in
+	let l2 =
+	  if rsize r = natsize then
+	    inttobin n
+	  else
+	    [n]	    
 	in
 	
-	(*let (bckt, c) = List.fold_left2 f ([], wireone) l1 l2 in*)
-	let (rbckt, c) = List.fold_left2 f ([], wireone) l1 l2 in
-	
-	(*bckt @ [copy (fst r3) c]*)
-	List.rev_append ((copy (fst r3) c)::rbckt) []
+	(*List.fold_left2 (fun c i1 i2 -> c @ [copy i1 i2]) [] l1 l2*)
+	List.rev_append (List.fold_left2 (fun c i1 i2 -> (copy i1 i2)::c) [] l1 l2) []
+      else
+	[]      
+    | Mux(r3, r1, r2, r4) ->    
+      let l1 = rangetolist r1 in
+      let l2 = rangetolist r2 in
+      let l3 = rangetolist r3 in
 
-      | _ -> raise (CGenError "Unsupported natop")
+      let f (c, out) b1 b2 =
+	let t1 = wireone in
+	let (t2, _) = walloc.getn 1 in
+	let g1 = XOR(t2, t1, (fst r4)) in
+	let (t3, _) = walloc.getn 1 in
+	let g2 = XOR(t3, b1, b2) in
+	let (t4, _) = walloc.getn 1 in
+	let g3 = AND(t4, t2, t3) in
+	let (t5, _) = walloc.getn 1 in
+	let g4 = XOR(t5, t4, b2) in
+	(*(c @ [g1; g2; g3; g4], out @ [t5])*)
+	g4::g3::g2::g1::c, t5::out
+      in
+
+      (*let (bckt, out) = List.fold_left2 f ([], []) l1 l2 in*)
+      let (rbckt, rout) = List.fold_left2 f ([], []) l1 l2 in
+      let (bckt, out) = List.rev_append rbckt [], List.rev_append rout [] in
+      
+      (*let f ckt b1 b2 = ckt @ [copy b1 b2] in*)
+      let f ckt b1 b2 = (copy b1 b2)::ckt in
+      List.rev_append (List.fold_left2 f bckt l3 out) []
+
+    | Gate(op, r3, r1, r2) ->
+      match op with
+	| Natop_plus ->
+	  get_add_circuit r1 r2 r3
+
+	| Natop_div ->
+	  (* ignore r2 *)
+
+	  (*
+	   * l1 is the list we are copying from, l2 is the list we are copying to
+	   *)
+	  let rec f l1 l2 ckt =
+	    if l1 = [] then
+	      ckt @ [copy (List.hd l2) 0]
+	    else
+	      f (List.tl l1) (List.tl l2) (ckt @ [copy (List.hd l2) (List.hd l1)])
+	  in
+
+	  f (List.tl (rangetolist r1)) (rangetolist r3) []
+	  
+	    
+	| Natop_mult -> 
+	  let l1 = rangetolist r1 in
+	  let l2 = rangetolist r2 in
+	  let l3 = rangetolist r3 in
+
+	  (*
+	   * ckt is the circuit to which we append to
+	   * l is the list of wire ranges that we need to add later on
+	   * index is the current bit index in l2 (starts from 0)
+	   * b is the actual bit
+	   *)	   
+	  let f (ckt, l, index) b =
+	    (* allocate nat width number of wires *)
+	    let r' = walloc.getn natsize in
+	    let l' = rangetolist r' in
+	    
+	    (*
+	     * iterate over l2
+	     * if i < index, pass on, copy 0 to corresponding bit in l'
+	     * if i >= index, add an AND gate with inp as b and l2[curr]
+	     * copy it to corresponding bit in l'
+	     *)
+	    let rec iter (_l2: int list) (_l': int list) (i: int) (_ckt: booleanckt list) =
+	      if i = natsize then
+		_ckt
+	      else if i < index then
+		iter _l2 (List.tl _l') (i + 1) (_ckt @ [(copy (List.hd _l') 0)])
+	      else
+		iter (List.tl _l2) (List.tl _l') (i + 1) (_ckt @ [(AND(List.hd _l', b, List.hd _l2))])
+	    in
+
+	    (ckt @ (iter l2 l' 0 []), l @ [r'], index + 1)
+	  in
+	  
+	  let (rowckts, rlist, _) = List.fold_left f ([], [], 0) l1 in
+
+	  (* now we need to have add circuits for ranges in rlist *)
+	  
+	  let rinit = walloc.getn natsize in
+	  let rinitckts = List.map (fun i -> copy i 0) (rangetolist rinit) in
+	  
+	  let f (ckt, accum) r =
+	    let rout = walloc.getn natsize in
+	    let _ckt = get_add_circuit accum r rout in
+	    (ckt @ _ckt, rout)
+	  in
+
+	  let (addckts, accum) = List.fold_left f ([], rinit) rlist in
+
+	  let f ckt b1 b2 = ckt @ [(copy b1 b2)] in
+
+	  let outckts = List.fold_left2 f [] l3 (rangetolist accum) in
+
+	  rowckts @ rinitckts @ addckts @ outckts
+
+	| Natop_sub ->
+	  let l1 = rangetolist r1 in
+	  let l2 = rangetolist r2 in
+	  let l3 = rangetolist r3 in
+
+	  let f (ckt, out, c) b1 b2 =
+	    let (t1, _) = walloc.getn 1 in
+	    let g1 = XOR(t1, b1, c) in
+	    let (t2, _) = walloc.getn 1 in
+	    let g2 = XOR(t2, b2, c) in
+	    let (t3, _) = walloc.getn 1 in
+	    let g3 = AND(t3, t1, t2) in
+	    let (c1, _) = walloc.getn 1 in
+	    let g4 = XOR(c1, t3, b1) in
+	    let (t4, _) = walloc.getn 1 in
+	    let g5 = XOR(t4, b1, b2) in
+	    let (t5, _) = walloc.getn 1 in
+	    let g6 = XOR(t5, t4, c) in
+	    let (s, _) = walloc.getn 1 in
+	    let g7 = XOR(s, t5, wireone) in
+	    (*(ckt @ [g1; g2; g3; g4; g5; g6; g7], out @ [s], c1)*)
+	    g7::g6::g5::g4::g3::g2::g1::ckt, s::out, c1
+	  in
+
+	  (*let (bckt, out, _) = List.fold_left2 f ([], [], wireone) l1 l2 in*)
+	  let (rbckt, rout, _) = List.fold_left2 f ([], [], wireone) l1 l2 in
+	  let bckt, out = List.rev_append rbckt [], List.rev_append rout [] in
+
+	  (*let f ckt b1 b2 = ckt @ [copy b1 b2] in*)
+	  let f ckt b1 b2 = (copy b1 b2)::ckt in
+	  List.rev_append (List.fold_left2 f bckt l3 out) []
+
+	| Natop_gt -> 
+	  let l1 = rangetolist r1 in
+	  let l2 = rangetolist r2 in
+
+	  let f (ckt, c) b1 b2 =
+	    let (t1, _) = walloc.getn 1 in
+	    let g1 = XOR(t1, b1, c) in
+	    let (t2, _) = walloc.getn 1 in
+	    let g2 = XOR(t2, b2, c) in
+	    let (t3, _) = walloc.getn 1 in
+	    let g3 = AND(t3, t1, t2) in
+	    let (c1, _) = walloc.getn 1 in
+	    let g4 = XOR(c1, t3, b1) in
+	    (*(ckt @ [g1; g2; g3; g4], c1)*)
+	    g4::g3::g2::g1::ckt, c1
+	  in
+
+	  (*let (bckt, c) = List.fold_left2 f ([], wirezero) l1 l2 in*)
+	  let (rbckt, c) = List.fold_left2 f ([], wirezero) l1 l2 in
+	  
+	  (*bckt @ [copy (fst r3) c]*)
+	  List.rev_append ((copy (fst r3) c)::rbckt) []
+
+	| Natop_equals -> 
+	  let l1 = rangetolist r1 in
+	  let l2 = rangetolist r2 in
+
+	  let f (ckt, c) b1 b2 =
+	    let (t1, _) = walloc.getn 1 in
+	    let g1 = XOR(t1, b1, b2) in
+	    let (t2, _) = walloc.getn 1 in
+	    let g2 = copy t2 1 in
+	    let (t3, _) = walloc.getn 1 in
+	    let g3 = XOR(t3, t1, t2) in
+	    let (c1, _) = walloc.getn 1 in
+	    let g4 = AND(c1, t3, c) in
+	    (*(ckt @ [g1; g2; g3; g4], c1)*)
+	    g4::g3::g2::g1::ckt, c1
+	  in
+	  
+	  (*let (bckt, c) = List.fold_left2 f ([], wireone) l1 l2 in*)
+	  let (rbckt, c) = List.fold_left2 f ([], wireone) l1 l2 in
+	  
+	  (*bckt @ [copy (fst r3) c]*)
+	  List.rev_append ((copy (fst r3) c)::rbckt) []
 
 (*
  * dumps bit representation of v in the file

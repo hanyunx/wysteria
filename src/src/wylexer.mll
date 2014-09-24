@@ -110,6 +110,8 @@ rule token = parse
   | "print"  { PRINT }
   | "sysop"  { SYSOP }
   | "subset" { SUBSET }
+  | "from"   { FROM }
+  | "to"     { TO }
   | "Sh"   { TSH }
   | "makesh" { MAKESH }
   | "combsh" { COMBSH }
