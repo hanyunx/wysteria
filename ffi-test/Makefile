@@ -24,22 +24,26 @@ else
 endif
 
 SOURCES := \
+	util.ml \
 	ffi.ml \
 	test.ml
 
 OBJS := $(SOURCES:.ml=.$(OEXT))
 
-PACKAGES := dynlink
+PACKAGES := dynlink extlib unix
 
-GL_PACKS = glMLite glMLite.glut glMLite.glu
-GFX_FLAGS = -I +sdl2 sdl2.cmxa $(GL_PACKS:%=-package %) \
+GFX_PACKS = sdl2 sdl2_img glMLite glMLite.glut glMLite.glu
+GFX_FLAGS = $(GFX_PACKS:%=-package %) \
 	-cclib "-framework CoreFoundation -framework Cocoa"
 
 BUILD_FLAGS := $(OCAML_FLAGS) $(PACKAGES:%=-package %)
-LINK_FLAGS  := $(BUILD_FLAGS) -linkpkg
+LINK_FLAGS  := $(BUILD_FLAGS) -linkpkg -linkall
 
-test: $(OBJS) extern.cmxs
+test: $(OBJS) extern.cmxs extern_gfx.cmxs
 	$(OCAMLC) $(LINK_FLAGS) $(OBJS) -o $@
+
+run: test
+	./test gfx
 
 gfx: extern_gfx.cmxs
 

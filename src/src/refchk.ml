@@ -39,6 +39,8 @@ let freshvar:fvt =
 		   r := !r + 1;
 		   s)
   }
+
+let z3bin = if Sys.file_exists "z3" then "./z3" else "z3"
       
 let rec bindref (z:z3Term) (rnd:refine_nd) (gettyp:var_nd -> typ) (e:zenv) (f:facts) :(z3Term * zenv * facts) =
   match rnd.data with
@@ -165,7 +167,7 @@ let dumpEnv (env:zenv) (out:out_channel) :unit =
   ) env
 
 let runz3 fname =
-  let inc = Unix.open_process_in ("./z3 -smt2 " ^ fname) in
+  let inc = Unix.open_process_in (z3bin ^ " -smt2 " ^ fname) in
   let line = input_line inc in
   let _ = Unix.close_process_in inc in
   line = "unsat"

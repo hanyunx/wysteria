@@ -6,8 +6,8 @@ To install Wysteria, you need the following dependencies installed:
 recommend downloading a precompiled z3, available from
 http://z3.codeplex.com/releases/view/101918.
 
-1. OCaml version 4.0 or higher. Note that OCaml 3.2 and lower will not
-work. You also need OCamlyacc, OCamllex, etc. These should be
+1. OCaml version 4.02.0 or higher. Note that OCaml 3.2 and lower will
+not work. You also need OCamlyacc, OCamllex, etc. These should be
 installed by default when you install OCaml, but that varies according
 to your distribution.
 
@@ -28,7 +28,7 @@ provided with this distribution, under gmw/.
 
 To build GMW, run "make" under gmw/.
 
-Copy the file gmw/gmw.exe to the src/ directory (not the src/
+Copy the file gmw/mpc.exe to the src/ directory (not the src/
 directory inside gmw/, copy it to wysteria/src/).
 
 4. With these dependencies installed, cd to the src/ directory, and
