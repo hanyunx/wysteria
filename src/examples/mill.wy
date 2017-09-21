@@ -1,9 +1,9 @@
 (* the arguments to f are, a party set and a wire bundle that contains a nat for each party in that set *)
 let f = \ (x:ps{true}) . \ (y:W x nat) .
-  (* tmp2 is the value returned from the secure computation, why do we have this? Rule [T-Let2] binds x with ambient mode, perhaps b     ecause we are in Top currently? *)
+  (* tmp2 is the value returned from the secure computation, why do we have this? Rule [T-Let2] binds x with ambient mode, perhaps b     ecause we are in Top currently? Yes. See typechk.ml, line 663 *)
   let tmp2 @ par(x) = 
-let tmp @ sec(x) =  (* start a secure block *)
-let a = wfold x [y;  (* fold function, main a record with current richest principal and their salary *)
+  let tmp @ sec(x) =  (* start a secure block *)
+  let a = wfold x [y;  (* fold function, main a record with current richest principal and their salary *)
  	               { #f:!Dummy, #g:0 }; (* assume every one has > 0 salary *)
 	               \ (a:{#f:ps{true}, #g:nat}) . \(b:ps{true}) . \(c:nat) . (* ps is a single party, so can we add singleton in the refinement? *)
                        if a.#g > c then (* accumulator is better, so leave as is *)
