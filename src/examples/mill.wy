@@ -5,11 +5,11 @@ let f = \ (x:ps{true}) . \ (y:W x nat) .
 let tmp @ sec(x) =  (* start a secure block *)
 let a = wfold x [y;  (* fold function, main a record with current richest principal and their salary *)
  	               { #f:!Dummy, #g:0 }; (* assume every one has > 0 salary *)
-	               \ (a:{#f:ps{true}, #g:nat}) . \(b:ps{true}) . \(c:nat) .
-                       if a.#g > c then
+	               \ (a:{#f:ps{true}, #g:nat}) . \(b:ps{true}) . \(c:nat) . (* ps is a single party, so can we add singleton in the refinement? *)
+                       if a.#g > c then (* accumulator is better, so leave as is *)
 			 a
 		       else
-			 {#f:b, #g:c}
+			 {#f:b, #g:c} (* we have a new richest principal *)
 	              ]
      in
      a.#f
