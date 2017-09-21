@@ -1,7 +1,9 @@
+(* the arguments to f are, a party set and a wire bundle that contains a nat for each party in that set *)
 let f = \ (x:ps{true}) . \ (y:W x nat) .
+  (* tmp2 is the value returned from the secure computation, why do we have this? Rule [T-Let2] binds x with ambient mode, perhaps b     ecause we are in Top currently? *)
   let tmp2 @ par(x) = 
-    let tmp @ sec(x) =
-      let a = wfold x [y;
+let tmp @ sec(x) =  (* start a secure block *)
+let a = wfold x [y;  (* fold function, main a record with current richest principal and their salary *)
  	               { #f:!Dummy, #g:0 }; (* assume every one has > 0 salary *)
 	               \ (a:{#f:ps{true}, #g:nat}) . \(b:ps{true}) . \(c:nat) .
                        if a.#g > c then
@@ -14,6 +16,7 @@ let f = \ (x:ps{true}) . \ (y:W x nat) .
     in 
     tmp
   in
+  (* return a wire bundle with each principal mapped to the result *)
   wire x:tmp2
 in
 
@@ -28,6 +31,7 @@ let w8 = w7 ++ w3 in
 let check_effects @ par(all) = (f all) w8
 in
 
+(* this wcopy lifts the resulst from par(all) mode to Top, we could do better with Top, also see the comment above *)
 wcopy as all from check_effects
 
 (*let all = {!Alice, !Bob, !Charlie, !Dave, !Evelyn, !Fred} in

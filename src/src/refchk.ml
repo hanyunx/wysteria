@@ -170,7 +170,7 @@ let runz3 fname =
   let inc = Unix.open_process_in (z3bin ^ " -smt2 " ^ fname) in
   let line = input_line inc in
   let _ = Unix.close_process_in inc in
-  line = "unsat"
+  String.trim line = "unsat"
   
 let verify r1 r2 (gettyp:var_nd -> typ) =
   freshvar.reset ();
